@@ -7,6 +7,7 @@
  */
 
 const NUMERIC_RE = /^-?\d+(\.\d+)?$/;
+const MAX_ROWS = 200000; // upper bound of rows parsed for full-dataset training
 
 function inferAndBuildColumns(headers, dataRows) {
   return headers.map((h) => {
@@ -88,7 +89,7 @@ export function parseCSVFile(file) {
 
         const headers = parseRow(lines[0]).map((h) => h.replace(/^"|"$/g, '').trim());
         const dataRows = [];
-        for (let i = 1; i < Math.min(lines.length, 5001); i++) {
+        for (let i = 1; i < Math.min(lines.length, MAX_ROWS + 1); i++) {
           const vals = parseRow(lines[i]);
           const row = {};
           headers.forEach((h, idx) => { row[h] = vals[idx] ?? ''; });
@@ -98,7 +99,8 @@ export function parseCSVFile(file) {
         resolve({
           columns: inferAndBuildColumns(headers, dataRows),
           row_count: lines.length - 1,
-          data_sample: dataRows.slice(0, 300),
+          rows: dataRows,                       // ALL parsed rows (for real training)
+          data_sample: dataRows.slice(0, 2000),
         });
       } catch (err) {
         reject(err);
@@ -122,7 +124,7 @@ export async function parseExcelFile(file) {
 
   const headers = rows[0].map((h, i) => (String(h).trim() || `coluna_${i + 1}`));
   const dataRows = [];
-  for (let i = 1; i < Math.min(rows.length, 5001); i++) {
+  for (let i = 1; i < Math.min(rows.length, MAX_ROWS + 1); i++) {
     const arr = rows[i];
     const row = {};
     headers.forEach((h, idx) => { row[h] = arr[idx] != null ? String(arr[idx]).trim() : ''; });
@@ -132,7 +134,8 @@ export async function parseExcelFile(file) {
   return {
     columns: inferAndBuildColumns(headers, dataRows),
     row_count: rows.length - 1,
-    data_sample: dataRows.slice(0, 300),
+    rows: dataRows,                       // ALL parsed rows (for real training)
+    data_sample: dataRows.slice(0, 2000),
     sheet_name: sheetName,
     sheet_count: wb.SheetNames.length,
   };

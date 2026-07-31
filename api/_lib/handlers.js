@@ -1,4 +1,4 @@
-import { queryAll, queryOne, run } from './db.js';
+import { queryAll, queryOne, run, db } from './db.js';
 import {
   json, newId, nowISO, hashPassword, verifyPassword, signToken,
   newTotpSecret, totpUri, verifyTotp, totpQrDataUrl,
@@ -345,6 +345,10 @@ export async function entitiesHandler(req, res, ctx) {
     if (method === 'DELETE') {
       if (!existing) return bad(res, 404, 'Registro não encontrado');
       await run('DELETE FROM records WHERE id = ? AND entity_type = ? AND created_by_id = ?', [id, type, owner]);
+      // Cascade: deleting a project also removes its stored dataset rows.
+      if (type === 'Project') {
+        try { await run('DELETE FROM dataset_rows WHERE project_id = ? AND owner_id = ?', [id, owner]); } catch { /* ignore */ }
+      }
       return json(res, 200, { ok: true });
     }
   }
@@ -417,6 +421,80 @@ export async function usersHandler(req, res, ctx) {
   }
 
   return bad(res, 404, 'Rota de usuários não encontrada');
+}
+
+// =====================================================================
+// DATASET ROWS  ->  /api/datarows/*   (full dataset storage, owner-scoped)
+// =====================================================================
+const MAX_ROWS_PER_PROJECT = 200000;
+
+export async function datarowsHandler(req, res, ctx) {
+  const me = await currentUserRow(req);
+  if (!me) return bad(res, 401, 'Não autenticado');
+  const { segments, method, body, query } = ctx;
+
+  // POST /api/datarows  { project_id, rows: [...], start_idx }
+  if (!segments[0] && method === 'POST') {
+    const projectId = body.project_id;
+    const rows = Array.isArray(body.rows) ? body.rows : [];
+    if (!projectId) return bad(res, 400, 'project_id ausente');
+    if (rows.length === 0) return json(res, 200, { inserted: 0 });
+
+    // enforce a sane cap per project
+    const cnt = await queryOne('SELECT COUNT(*) AS n FROM dataset_rows WHERE project_id = ? AND owner_id = ?', [projectId, me.id]);
+    const existing = cnt?.n || 0;
+    if (existing + rows.length > MAX_ROWS_PER_PROJECT) {
+      return json(res, 507, { error: `Limite de ${MAX_ROWS_PER_PROJECT.toLocaleString('pt-BR')} linhas por projeto atingido.`, code: 'ROW_LIMIT', stored: existing });
+    }
+
+    const startIdx = Number(body.start_idx) || existing;
+    const stmts = rows.map((r, i) => ({
+      sql: 'INSERT INTO dataset_rows (id, project_id, owner_id, idx, data) VALUES (?,?,?,?,?)',
+      args: [newId(), projectId, me.id, startIdx + i, JSON.stringify(r)],
+    }));
+    try {
+      await db().batch(stmts, 'write');
+      return json(res, 200, { inserted: rows.length, total: existing + rows.length });
+    } catch (e) {
+      const msg = String(e.message || '');
+      const isMem = /NOMEM|out of memory|too large|database or disk is full|quota/i.test(msg);
+      return json(res, isMem ? 507 : 500, {
+        error: isMem
+          ? 'O banco de dados atingiu um limite de armazenamento/memória ao salvar as linhas.'
+          : `Falha ao salvar linhas: ${msg}`,
+        code: isMem ? 'DB_LIMIT' : 'DB_ERROR',
+        stored: existing,
+      });
+    }
+  }
+
+  // routes with :projectId
+  const projectId = segments[0];
+  if (projectId) {
+    // GET /api/datarows/:projectId/count
+    if (segments[1] === 'count' && method === 'GET') {
+      const c = await queryOne('SELECT COUNT(*) AS n FROM dataset_rows WHERE project_id = ? AND owner_id = ?', [projectId, me.id]);
+      return json(res, 200, { count: c?.n || 0 });
+    }
+    // GET /api/datarows/:projectId?limit=&offset=
+    if (method === 'GET') {
+      const limit = Math.min(50000, Number(query.limit) || 20000);
+      const offset = Number(query.offset) || 0;
+      const rs = await queryAll(
+        'SELECT data FROM dataset_rows WHERE project_id = ? AND owner_id = ? ORDER BY idx ASC LIMIT ? OFFSET ?',
+        [projectId, me.id, limit, offset]
+      );
+      const rows = rs.map((r) => { try { return JSON.parse(r.data); } catch { return {}; } });
+      return json(res, 200, { rows, count: rows.length });
+    }
+    // DELETE /api/datarows/:projectId
+    if (method === 'DELETE') {
+      await run('DELETE FROM dataset_rows WHERE project_id = ? AND owner_id = ?', [projectId, me.id]);
+      return json(res, 200, { ok: true });
+    }
+  }
+
+  return bad(res, 404, 'Rota de dataset_rows não encontrada');
 }
 
 // =====================================================================

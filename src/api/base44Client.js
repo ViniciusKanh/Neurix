@@ -90,6 +90,14 @@ export const settingsApi = {
   testEmail: (cfg) => api('/settings/email/test', { method: 'POST', body: cfg }),
 };
 
+// ---- Full dataset rows (real training) -----------------------------------
+export const datarowsApi = {
+  append: (project_id, rows, start_idx) => api('/datarows', { method: 'POST', body: { project_id, rows, start_idx } }),
+  getAll: (projectId, limit = 20000) => api(`/datarows/${projectId}${qs({ limit })}`),
+  count: (projectId) => api(`/datarows/${projectId}/count`),
+  remove: (projectId) => api(`/datarows/${projectId}`, { method: 'DELETE' }),
+};
+
 // ---- User management (admin) ---------------------------------------------
 export const usersApi = {
   list: () => api('/users'),

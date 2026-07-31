@@ -8,6 +8,7 @@
     "dev:web": "vite",
     "dev:api": "node server.mjs",
     "db:migrate": "node scripts/migrate.mjs",
+    "db:clean-files": "node scripts/clean-files.mjs",
     "build": "vite build",
     "lint": "eslint . --quiet",
     "lint:fix": "eslint . --fix",

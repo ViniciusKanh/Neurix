@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { parseAnyFile } from '@/lib/parseDataset';
-import { base44 } from '@/api/base44Client';
+import { base44, datarowsApi } from '@/api/base44Client';
 import { useNavigate } from 'react-router-dom';
 import { Upload, FileSpreadsheet, ArrowRight, Loader2, Database } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -21,6 +21,8 @@ export default function NewProject() {
   const [isDragging, setIsDragging] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [step, setStep] = useState('info'); // info | upload | processing
+  const [progress, setProgress] = useState(0);
+  const [progressMsg, setProgressMsg] = useState('');
 
   const handleDrop = useCallback((e) => {
     e.preventDefault();
@@ -34,12 +36,28 @@ export default function NewProject() {
     if (f) setFile(f);
   };
 
+  // Picks up to maxRows rows, but stops early if the JSON gets too big — keeps
+  // the stored record small enough to never hit Turso's memory limit.
+  function boundedSample(rows, maxRows = 1000, maxBytes = 600000) {
+    const out = [];
+    let bytes = 0;
+    for (const r of rows) {
+      if (out.length >= maxRows) break;
+      const s = JSON.stringify(r);
+      if (bytes + s.length > maxBytes && out.length >= 50) break;
+      bytes += s.length;
+      out.push(r);
+    }
+    return out;
+  }
+
   const handleCreate = async () => {
     if (!name.trim()) return toast.error('Por favor, insira um nome para o projeto');
     setIsCreating(true);
     setStep('processing');
 
     let projectData = { name, description, status: 'draft' };
+    let parsedRows = [];
 
     if (file) {
       toast.info('Lendo estrutura do dataset...');
@@ -59,16 +77,19 @@ export default function NewProject() {
         return toast.error('O arquivo não contém dados legíveis. Verifique se é um CSV ou Excel válido.');
       }
 
-      toast.info('Enviando arquivo...');
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      projectData.dataset_file_url = file_url;
+      // We do NOT store the raw file in Turso (it would bloat a single cell and
+      // hit the free-tier memory limit). We keep only the parsed metadata +
+      // a bounded sample, which is everything the app needs.
+      projectData.dataset_file_url = `local://${file.name}`;
       projectData.dataset_filename = file.name;
 
       if (parsed && parsed.row_count > 0) {
+        parsedRows = parsed.rows || parsed.data_sample || [];
         projectData.column_info = parsed.columns || [];
         projectData.dataset_size = parsed.row_count;
         projectData.dataset_columns = (parsed.columns || []).length;
-        projectData.data_sample = (parsed.data_sample || []).slice(0, 300);
+        // Small in-record preview sample (bounded so it never bloats a cell).
+        projectData.data_sample = boundedSample(parsed.data_sample || [], 1000, 600000);
         projectData.status = 'exploring';
 
         // Local diagnosis — no external API
@@ -81,7 +102,44 @@ export default function NewProject() {
       }
     }
 
-    const project = await base44.entities.Project.create(projectData);
+    let project;
+    try {
+      project = await base44.entities.Project.create(projectData);
+    } catch (err) {
+      setIsCreating(false);
+      setStep('info');
+      return toast.error(`Não foi possível criar o projeto: ${err.message}`);
+    }
+
+    // Upload ALL rows in batches for real full-dataset training.
+    const allRows = file && parsedRows ? parsedRows : [];
+    if (allRows.length > 0) {
+      const BATCH = 500;
+      let stored = 0;
+      let limitHit = false;
+      setProgressMsg('Armazenando linhas para treino...');
+      for (let i = 0; i < allRows.length; i += BATCH) {
+        const chunk = allRows.slice(i, i + BATCH);
+        try {
+          await datarowsApi.append(project.id, chunk, i);
+          stored += chunk.length;
+          setProgress(Math.round((stored / allRows.length) * 100));
+        } catch (err) {
+          const code = err.data?.code;
+          if (code === 'DB_LIMIT' || code === 'ROW_LIMIT') {
+            limitHit = true;
+            toast.error(`Banco atingiu o limite — o projeto ficou com ${stored.toLocaleString('pt-BR')} de ${allRows.length.toLocaleString('pt-BR')} linhas. As análises usarão o que coube.`);
+          } else {
+            toast.error(`Falha ao salvar linhas: ${err.message}. Projeto criado com ${stored.toLocaleString('pt-BR')} linhas.`);
+          }
+          break;
+        }
+      }
+      // record how many rows were actually persisted
+      try { await base44.entities.Project.update(project.id, { rows_stored: stored }); } catch { /* non-fatal */ }
+      if (!limitHit && stored === allRows.length) toast.success(`${stored.toLocaleString('pt-BR')} linhas armazenadas para treino real.`);
+    }
+
     toast.success('Projeto criado com sucesso!');
     setIsCreating(false);
     navigate(`/projects/${project.id}`);

@@ -72,6 +72,14 @@ async function main() {
       key TEXT PRIMARY KEY,
       value TEXT
     )`,
+    `CREATE TABLE IF NOT EXISTS dataset_rows (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      owner_id TEXT NOT NULL,
+      idx INTEGER NOT NULL,
+      data TEXT NOT NULL
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_dataset_rows_proj ON dataset_rows(project_id, owner_id)`,
   ], 'write');
 
   // Add 'status' column to users if it doesn't exist yet (idempotent).
@@ -84,7 +92,7 @@ async function main() {
   // Ensure existing users are marked active.
   await db.execute(`UPDATE users SET status = 'active' WHERE status IS NULL OR status = ''`);
 
-  console.log('✓ Tabelas prontas: users, files, records, tokens, settings');
+  console.log('✓ Tabelas prontas: users, files, records, tokens, settings, dataset_rows');
 
   // Seed admin ---------------------------------------------------------------
   const existing = await db.execute({

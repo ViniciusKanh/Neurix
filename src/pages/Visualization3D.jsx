@@ -429,13 +429,13 @@ export default function Visualization3D() {
     setClusterData(null);
 
     try {
-      const response = await fetch(project.dataset_file_url);
-      const text = await response.text();
-      const { headers, data: rows } = parseCSV(text);
+      // Use the stored data sample (the raw file is no longer kept in the DB).
+      const headers = (project.column_info || []).map((c) => c.name);
+      const rows = (project.data_sample || []).map((r) => headers.map((h) => r[h]));
       const { features, featureHeaders } = extractNumericFeatures(headers, rows);
 
       if (features.length < 10 || featureHeaders.length < 2) {
-        toast.error('Dataset precisa de pelo menos 2 colunas numéricas e 10 linhas');
+        toast.error('São necessárias ≥ 2 colunas numéricas e ≥ 10 linhas na amostra. Reenvie o dataset se ele foi criado antes desta atualização.');
         setIsComputing(false);
         return;
       }

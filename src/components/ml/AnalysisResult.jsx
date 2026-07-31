@@ -26,7 +26,14 @@ export default function AnalysisResult({ analysis }) {
           <h3 className="font-semibold text-foreground">{analysis.name}</h3>
           <p className="text-xs text-muted-foreground">{typeLabel}</p>
         </div>
-        <StatusBadge status={analysis.status} />
+        <div className="flex items-center gap-2">
+          {results.training_mode && (
+            <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${results.training_mode === 'real' ? 'bg-accent/15 text-accent' : 'bg-amber-400/15 text-amber-400'}`}>
+              {results.training_mode === 'real' ? `✓ Treino real${results.trained_on ? ` · ${results.trained_on.toLocaleString('pt-BR')} linhas` : ''}` : '~ Estimativa'}
+            </span>
+          )}
+          <StatusBadge status={analysis.status} />
+        </div>
       </div>
 
       {analysis.status === 'completed' && (

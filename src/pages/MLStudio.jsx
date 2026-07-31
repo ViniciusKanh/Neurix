@@ -14,6 +14,8 @@ import ModelComparison from '@/components/ml/ModelComparison';
 import { Brain, Play, Loader2, GitCompare, Settings2, Trash2, Wrench, Pencil } from 'lucide-react';
 
 import { runClassification, runRegression, runClustering, runAnomalyDetection, runDimReduction, runFeatureSelection } from '@/lib/localML';
+import { runRealClassification, runRealRegression, runRealClustering } from '@/lib/realML';
+import { datarowsApi } from '@/api/base44Client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -198,26 +200,52 @@ export default function MLStudio() {
     });
     setCustomName('');
 
-    // ── Local ML engine — no external API ──
-    await new Promise(r => setTimeout(r, 1200)); // simulate processing
-    let result;
-    if (taskType === 'classification') result = runClassification(project, targetColumn, splitRatio, cvStrategy, balancing);
-    else if (taskType === 'regression') result = runRegression(project, targetColumn, splitRatio, cvStrategy);
-    else if (taskType === 'clustering') result = runClustering(project);
-    else if (taskType === 'anomaly_detection') result = runAnomalyDetection(project);
-    else if (taskType === 'dimensionality_reduction') result = runDimReduction(project);
-    else if (taskType === 'feature_selection') result = runFeatureSelection(project, targetColumn);
-    else result = { interpretation: 'Análise concluída.', recommendations: [] };
+    try {
+      // Try REAL training on the full stored rows; fall back to the estimator.
+      let rows = [];
+      try {
+        const r = await datarowsApi.getAll(selectedProjectId, 20000);
+        rows = r.rows || [];
+      } catch { rows = []; }
 
-    await base44.entities.Analysis.update(analysis.id, {
-      status: 'completed', results: result,
-      ai_interpretation: result?.interpretation || '',
-      ai_recommendations: result?.recommendations || [],
-    });
+      const testRatio = (() => { const m = /\/(\d+)/.exec(splitRatio || ''); return m ? Math.min(0.5, Math.max(0.1, parseInt(m[1]) / 100)) : 0.2; })();
+      const canReal = rows.length >= 20 && ['classification', 'regression', 'clustering'].includes(taskType);
 
-    queryClient.invalidateQueries({ queryKey: ['analyses', selectedProjectId] });
-    setIsRunning(false);
-    toast.success('Análise concluída!');
+      let result; let realUsed = false;
+      if (canReal && taskType === 'classification') { result = runRealClassification(rows, targetColumn, project.column_info, testRatio, selectedModel); realUsed = !result.error; }
+      else if (canReal && taskType === 'regression') { result = runRealRegression(rows, targetColumn, project.column_info, testRatio, selectedModel); realUsed = !result.error; }
+      else if (canReal && taskType === 'clustering') { result = runRealClustering(rows, project.column_info, 3); realUsed = !result.error; }
+
+      // Fallback (no rows stored, or real engine returned an error/edge case)
+      if (!result || result.error) {
+        realUsed = false;
+        await new Promise(r => setTimeout(r, 600));
+        if (taskType === 'classification') result = runClassification(project, targetColumn, splitRatio, cvStrategy, balancing);
+        else if (taskType === 'regression') result = runRegression(project, targetColumn, splitRatio, cvStrategy);
+        else if (taskType === 'clustering') result = runClustering(project);
+        else if (taskType === 'anomaly_detection') result = runAnomalyDetection(project);
+        else if (taskType === 'dimensionality_reduction') result = runDimReduction(project);
+        else if (taskType === 'feature_selection') result = runFeatureSelection(project, targetColumn);
+        else result = { interpretation: 'Análise concluída.', recommendations: [] };
+      }
+
+      result.training_mode = realUsed ? 'real' : 'estimado';
+
+      await base44.entities.Analysis.update(analysis.id, {
+        status: 'completed', results: result,
+        ai_interpretation: result?.interpretation || '',
+        ai_recommendations: result?.recommendations || [],
+      });
+
+      queryClient.invalidateQueries({ queryKey: ['analyses', selectedProjectId] });
+      toast.success(realUsed ? `Treino real concluído sobre ${(result.trained_on || rows.length).toLocaleString('pt-BR')} linhas!` : 'Análise concluída (estimativa — projeto sem linhas armazenadas).');
+    } catch (err) {
+      try { await base44.entities.Analysis.update(analysis.id, { status: 'failed', ai_interpretation: `Falha: ${err.message}` }); } catch { /* ignore */ }
+      queryClient.invalidateQueries({ queryKey: ['analyses', selectedProjectId] });
+      toast.error(`Falha ao treinar: ${err.message}`);
+    } finally {
+      setIsRunning(false);
+    }
   };
 
   const deleteAnalysis = async (id, e) => {
