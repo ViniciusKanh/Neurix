@@ -100,12 +100,17 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen relative flex items-center justify-center overflow-hidden bg-background bg-grid-pattern px-4 py-8">
+    <div className="min-h-screen relative flex overflow-hidden bg-background bg-grid-pattern">
       <div className="pointer-events-none absolute -top-32 -left-32 w-96 h-96 rounded-full bg-primary/20 blur-[120px] animate-glow-pulse" />
       <div className="pointer-events-none absolute -bottom-40 -right-24 w-[28rem] h-[28rem] rounded-full bg-accent/20 blur-[130px] animate-glow-pulse" style={{ animationDelay: '1s' }} />
       <div className="pointer-events-none absolute inset-0 bg-scan-lines opacity-30" />
-      <div className="pointer-events-none absolute right-[8%] top-[12%] opacity-[0.05] hidden lg:block"><ModaraLogoMark size={280} /></div>
 
+      <div className="relative w-full grid lg:grid-cols-2 min-h-screen">
+      {/* ── Left: project explanation (desktop) ── */}
+      <IntroPanel />
+
+      {/* ── Right: auth form ── */}
+      <div className="flex items-center justify-center px-4 py-8">
       <div className="relative w-full max-w-md">
         <div className="flex flex-col items-center mb-8">
           <div className="relative mb-3">
@@ -213,6 +218,11 @@ export default function Login() {
         </div>
 
         <p className="text-center text-[10px] text-muted-foreground/50 mt-6 font-mono tracking-wider">NEURIX © {new Date().getFullYear()} · Machine Learning sem LLM externo</p>
+        <p className="text-center mt-2">
+          <a href="/privacy" className="text-[10px] text-muted-foreground/60 hover:text-primary underline">Política de Privacidade</a>
+        </p>
+      </div>
+      </div>
       </div>
 
       <style>{`
@@ -240,5 +250,47 @@ function SubmitBtn({ loading, disabled, children }) {
     <button type="submit" disabled={loading || disabled} className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-accent text-primary-foreground font-bold py-3 text-sm hover:opacity-90 transition disabled:opacity-40 glow-primary">
       {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : children}
     </button>
+  );
+}
+
+function IntroPanel() {
+  const features = [
+    ['📊', 'Explore seus dados', 'EDA completo: distribuições, correlações, outliers, balanceamento de classes e qualidade.'],
+    ['🤖', 'Treine modelos de verdade', 'Classificação, regressão e clustering treinados sobre todo o dataset — métricas reais, não estimativas.'],
+    ['🚀', 'Coloque em produção', 'Deploy, inferência ao vivo, testes A/B, Champion×Challenger e monitoramento de drift.'],
+    ['🔒', '100% local, sem IA externa', 'Seus dados ficam no seu navegador. Nada de LLM, nada de nuvem de terceiros.'],
+  ];
+  return (
+    <div className="hidden lg:flex flex-col justify-center px-12 xl:px-20 py-12 relative">
+      <div className="pointer-events-none absolute right-6 top-10 opacity-[0.06]"><ModaraLogoMark size={220} /></div>
+      <div className="relative">
+        <div className="flex items-center gap-3 mb-6">
+          <ModaraLogoMark size={48} />
+          <div>
+            <h1 className="font-display font-extrabold text-2xl tracking-[0.28em] text-gradient-primary leading-none">NEURIX</h1>
+            <p className="text-[9px] text-primary/50 font-mono uppercase tracking-[0.3em] mt-1">ML Workbench</p>
+          </div>
+        </div>
+        <h2 className="text-2xl xl:text-3xl font-display font-bold text-foreground leading-tight mb-3">
+          Da base de dados ao modelo em produção, <span className="text-gradient-primary">sem escrever código.</span>
+        </h2>
+        <p className="text-sm text-muted-foreground max-w-md mb-8 leading-relaxed">
+          O Neurix é uma workbench de Machine Learning inspirada no WEKA: você sobe um dataset (CSV/Excel),
+          explora, treina modelos clássicos de verdade e acompanha tudo — de forma visual, guiada e transparente.
+          Ideal para estudo, prototipagem e análise de dados.
+        </p>
+        <div className="space-y-4 max-w-md">
+          {features.map(([emoji, title, desc]) => (
+            <div key={title} className="flex gap-3">
+              <div className="w-9 h-9 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-lg flex-shrink-0">{emoji}</div>
+              <div>
+                <p className="text-sm font-semibold text-foreground">{title}</p>
+                <p className="text-xs text-muted-foreground leading-snug">{desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }

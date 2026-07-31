@@ -88,6 +88,28 @@ Uma **workbench analítica** onde você:
 - 👥 **Controle de usuários** com acesso por página/recurso.
 - 🎨 **Temas personalizáveis** — troque a cor de destaque de todo o app (e do logo!).
 
+> 🧠 **Treino de verdade:** os modelos (Regressão Logística, Árvore de Decisão, **Random Forest**, **Gradient Boosting**, **SVM**, KNN, Naive Bayes / Linear, Ridge, Lasso, Árvore, RF, GB) são treinados **sobre todo o dataset**, com split treino/teste e métricas reais — nada de estimativas.
+
+---
+
+## 📸 Screenshots
+
+<div align="center">
+
+| Novo projeto | Explorador de dados | ML Studio |
+|:---:|:---:|:---:|
+| ![Novo projeto](docs/screenshots/new-project.png) | ![Explorador](docs/screenshots/explorer.png) | ![ML Studio](docs/screenshots/ml-studio.png) |
+| **AutoML Pipeline** | **Pipeline do projeto** | **Regras de associação** |
+| ![AutoML](docs/screenshots/automl.png) | ![Pipeline](docs/screenshots/pipeline.png) | ![Regras de associação](docs/screenshots/association.png) |
+| **Champion × Challenger** | **Testes A/B** | **Monitoramento de drift** |
+| ![Champion vs Challenger](docs/screenshots/champion-challenger.png) | ![Testes A/B](docs/screenshots/ab-test.png) | ![Monitoramento](docs/screenshots/monitoring.png) |
+| **Inferência & Retreino** | **Inferência causal** | **Calibração de modelos** |
+| ![Inferência](docs/screenshots/inference.png) | ![Inferência causal](docs/screenshots/causal.png) | ![Calibração](docs/screenshots/calibration.png) |
+| **Visualização 3D (PCA)** | **Relatórios** | **Personalização** |
+| ![Visualização 3D](docs/screenshots/viz3d.png) | ![Relatórios](docs/screenshots/reports.png) | ![Personalização](docs/screenshots/settings.png) |
+
+</div>
+
 ---
 
 ## 🏗️ Arquitetura
@@ -294,6 +316,17 @@ git add .
 git commit -m "descrição da mudança"
 git push
 ```
+
+---
+
+## 📲 Instalar como app / Microsoft Store
+
+O Neurix é um **PWA** — dá para instalar direto do navegador (Edge/Chrome → "Instalar app") e
+também **publicar na Microsoft Store**. O manifesto, os ícones e o service worker já estão em `public/`,
+e há uma página de **Política de Privacidade** pronta em `/privacy`.
+
+👉 Passo a passo completo (PWABuilder + Partner Center) e textos prontos para a listagem:
+**[docs/MICROSOFT_STORE.md](docs/MICROSOFT_STORE.md)**
 
 ---
 

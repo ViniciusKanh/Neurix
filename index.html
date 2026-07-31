@@ -3,9 +3,20 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><defs><linearGradient id=%22g%22 x1=%220%25%22 y1=%220%25%22 x2=%22100%25%22 y2=%22100%25%22><stop offset=%220%25%22 stop-color=%22%2300f0ff%22/><stop offset=%22100%25%22 stop-color=%22%2300e57a%22/></linearGradient></defs><rect width=%2232%22 height=%2232%22 rx=%226%22 fill=%22%230a0f1e%22/><path d=%22M6 22 L10 10 L16 18 L22 10 L26 22%22 fill=%22none%22 stroke=%22url(%23g)%22 stroke-width=%222.5%22 stroke-linejoin=%22round%22 stroke-linecap=%22round%22/><circle cx=%2216%22 cy=%2218%22 r=%222%22 fill=%22%2300f0ff%22/></svg>" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Neurix — ML Workbench</title>
-    <meta name="description" content="Neurix — workbench analítica de Machine Learning 100% local para explorar dados, treinar modelos e fazer inferência" />
+    <meta name="description" content="Neurix — workbench de Machine Learning 100% local para explorar dados, treinar modelos reais e fazer inferência. Sem código e sem IA externa." />
+
+    <!-- PWA -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#00F0FF" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Neurix" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
   </head>
   <body>
     <div id="root"></div>

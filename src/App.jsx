@@ -40,10 +40,16 @@ import Deploy from './pages/Deploy';
 import Login from './pages/Login';
 import Settings from './pages/Settings';
 import UserManagement from './pages/UserManagement';
+import Privacy from './pages/Privacy';
 
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isAuthenticated } = useAuth();
+
+  // Public route — accessible without login (required for app store listing).
+  if (typeof window !== 'undefined' && window.location.pathname === '/privacy') {
+    return <Privacy />;
+  }
 
   if (isLoadingAuth) {
     return (
@@ -95,6 +101,7 @@ const AuthenticatedApp = () => {
         <Route path="/deploy" element={<Deploy />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/users" element={<UserManagement />} />
+        <Route path="/privacy" element={<Privacy />} />
 
       </Route>
       <Route path="*" element={<PageNotFound />} />

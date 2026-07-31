@@ -10,3 +10,10 @@ initTheme()
 ReactDOM.createRoot(document.getElementById('root')).render(
   <App />
 )
+
+// Register the PWA service worker (installability + offline shell).
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {})
+  })
+}

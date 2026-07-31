@@ -4,14 +4,19 @@ import Sidebar from './Sidebar';
 import AnimatedBackground from './AnimatedBackground';
 import MobileBottomNav from './MobileBottomNav';
 import UserMenu from './UserMenu';
+import Onboarding, { shouldShowOnboarding } from '@/components/Onboarding';
 import { cn } from '@/lib/utils';
 
 export default function AppLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [onboarding, setOnboarding] = useState(false);
+
+  useEffect(() => { setOnboarding(shouldShowOnboarding()); }, []);
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
+      {onboarding && <Onboarding onClose={() => setOnboarding(false)} />}
       {/* Tactical background */}
       <AnimatedBackground />
 

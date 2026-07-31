@@ -14,7 +14,6 @@ const BASE_TABS = [
   { key: 'profile', label: 'Perfil', icon: UserIcon },
   { key: 'appearance', label: 'Aparência', icon: Palette },
   { key: 'security', label: 'Segurança', icon: Shield },
-  { key: 'connection', label: 'Conexão Turso', icon: Database },
 ];
 
 export default function Settings() {
@@ -24,8 +23,9 @@ export default function Settings() {
   if (!user) return null;
 
   const isAdmin = user.role === 'admin';
+  // Turso connection + Email are admin-only (infra config).
   const TABS = isAdmin
-    ? [...BASE_TABS.slice(0, 3), { key: 'email', label: 'Email', icon: Mail }, ...BASE_TABS.slice(3)]
+    ? [...BASE_TABS, { key: 'email', label: 'Email', icon: Mail }, { key: 'connection', label: 'Conexão Turso', icon: Database }]
     : BASE_TABS;
 
   return (
@@ -53,7 +53,7 @@ export default function Settings() {
       {tab === 'appearance' && <AppearanceTab />}
       {tab === 'email' && isAdmin && <EmailTab />}
       {tab === 'security' && <SecurityTab user={user} refreshUser={refreshUser} />}
-      {tab === 'connection' && <ConnectionTab />}
+      {tab === 'connection' && isAdmin && <ConnectionTab />}
     </div>
   );
 }
