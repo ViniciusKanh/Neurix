@@ -444,7 +444,7 @@ export default function AnalyticsDashboard() {
       {view === 'Produção' && (
         <div className="space-y-4">
           {activeDeploys.length === 0 ? (
-            <EmptyState icon={Zap} title="Nenhum deploy ativo" description="Implante um modelo em produção para ver métricas aqui" action={<Link to="/deployment" className="text-xs text-primary hover:underline">Ir para Deployments →</Link>} />
+            <EmptyState icon={Zap} title="Nenhum deploy ativo" description="Implante um modelo em produção para ver métricas aqui" action={<Link to="/deploy" className="text-xs text-primary hover:underline">Ir para Deploy →</Link>} />
           ) : (
             <>
               {/* Scatter: calls x latency */}

@@ -136,7 +136,7 @@ export default function ModelMonitoring() {
   const approveAndDeploy = () => {
     setShowApproval(false);
     setPipelineStep(null);
-    window.location.href = `/deployment?project=${selectedProjectId}&trigger=automl`;
+    window.location.href = `/deploy?project=${selectedProjectId}`;
   };
 
   const overallScore = result?.overall_drift_score ?? 0;
