@@ -316,18 +316,6 @@ git add .
 git commit -m "descrição da mudança"
 git push
 ```
-
----
-
-## 📲 Instalar como app / Microsoft Store
-
-O Neurix é um **PWA** — dá para instalar direto do navegador (Edge/Chrome → "Instalar app") e
-também **publicar na Microsoft Store**. O manifesto, os ícones e o service worker já estão em `public/`,
-e há uma página de **Política de Privacidade** pronta em `/privacy`.
-
-👉 Passo a passo completo (PWABuilder + Partner Center) e textos prontos para a listagem:
-**[docs/MICROSOFT_STORE.md](docs/MICROSOFT_STORE.md)**
-
 ---
 
 ## 🗂️ Estrutura do projeto
