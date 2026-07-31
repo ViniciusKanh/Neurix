@@ -131,12 +131,10 @@ export default function Login() {
               <Field icon={Lock} label="Senha"><input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} className="login-input" placeholder="••••••••" /></Field>
               {error && <ErrorMsg>{error}</ErrorMsg>}
               <SubmitBtn loading={loading}>Entrar <ArrowRight className="w-4 h-4" /></SubmitBtn>
-              {emailEnabled && (
-                <div className="flex items-center justify-between text-xs pt-1">
-                  <button type="button" onClick={() => go('forgot')} className="text-muted-foreground hover:text-primary">Esqueceu a senha?</button>
-                  <button type="button" onClick={() => go('register')} className="text-primary hover:underline">Criar conta</button>
-                </div>
-              )}
+              <div className="flex items-center justify-between text-xs pt-1">
+                <button type="button" onClick={() => go('forgot')} className="text-muted-foreground hover:text-primary">Esqueceu a senha?</button>
+                <button type="button" onClick={() => go('register')} className="text-primary hover:underline">Criar conta</button>
+              </div>
             </form>
           )}
 
