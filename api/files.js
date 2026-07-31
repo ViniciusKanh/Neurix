@@ -1,5 +1,5 @@
-import { filesHandler } from '../_lib/handlers.js';
-import { makeCtx } from '../_lib/adapter.js';
+import { filesHandler } from './_lib/handlers.js';
+import { makeCtx } from './_lib/adapter.js';
 
 export const config = { api: { bodyParser: { sizeLimit: '8mb' } } };
 

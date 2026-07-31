@@ -1,9 +1,9 @@
-import { usersHandler } from '../_lib/handlers.js';
-import { makeCtx } from '../_lib/adapter.js';
+import { entitiesHandler } from './_lib/handlers.js';
+import { makeCtx } from './_lib/adapter.js';
 
 export default async function handler(req, res) {
   try {
-    await usersHandler(req, res, makeCtx(req, 'users'));
+    await entitiesHandler(req, res, makeCtx(req, 'entities'));
   } catch (e) {
     res.statusCode = 500;
     res.setHeader('Content-Type', 'application/json');

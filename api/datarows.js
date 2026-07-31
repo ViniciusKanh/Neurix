@@ -1,5 +1,5 @@
-import { datarowsHandler } from '../_lib/handlers.js';
-import { makeCtx } from '../_lib/adapter.js';
+import { datarowsHandler } from './_lib/handlers.js';
+import { makeCtx } from './_lib/adapter.js';
 
 export const config = { api: { bodyParser: { sizeLimit: '6mb' } } };
 

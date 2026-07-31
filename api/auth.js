@@ -1,9 +1,9 @@
-import { entitiesHandler } from '../_lib/handlers.js';
-import { makeCtx } from '../_lib/adapter.js';
+import { authHandler } from './_lib/handlers.js';
+import { makeCtx } from './_lib/adapter.js';
 
 export default async function handler(req, res) {
   try {
-    await entitiesHandler(req, res, makeCtx(req, 'entities'));
+    await authHandler(req, res, makeCtx(req, 'auth'));
   } catch (e) {
     res.statusCode = 500;
     res.setHeader('Content-Type', 'application/json');

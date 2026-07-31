@@ -24,8 +24,23 @@ function authHeaders(extra = {}) {
   return h;
 }
 
+// Vercel routes multi-segment paths under a catch-all inconsistently, so we
+// collapse every call to a single fixed path per resource: /api/<resource>,
+// and pass the rest of the route as a `path` query param. e.g.
+//   /entities/Analysis/filter  ->  /api/entities?path=Analysis/filter
+function buildUrl(path) {
+  const [p, qs0] = String(path).split('?');
+  const segs = p.split('/').filter(Boolean);           // [resource, ...rest]
+  const resource = segs[0] || '';
+  const rest = segs.slice(1).join('/');
+  const params = new URLSearchParams(qs0 || '');
+  if (rest) params.set('path', rest);
+  const q = params.toString();
+  return `/api/${resource}${q ? `?${q}` : ''}`;
+}
+
 async function api(path, { method = 'GET', body } = {}) {
-  const res = await fetch(`/api${path}`, {
+  const res = await fetch(buildUrl(path), {
     method,
     headers: authHeaders(body != null ? { 'Content-Type': 'application/json' } : {}),
     body: body != null ? JSON.stringify(body) : undefined,

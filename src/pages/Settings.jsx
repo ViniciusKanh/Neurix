@@ -427,7 +427,7 @@ function ConnectionTab() {
   const check = async () => {
     setChecking(true);
     try {
-      const r = await fetch('/api/auth/health').then((x) => x.json());
+      const r = await fetch('/api/auth?path=health').then((x) => x.json());
       setStatus(r);
     } catch (e) {
       setStatus({ ok: false, error: e.message });

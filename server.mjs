@@ -23,16 +23,15 @@ const wrap = (h, base) => async (req, res) => {
   }
 };
 
-app.all('/api/auth/*', wrap(authHandler, 'auth'));
-app.all('/api/entities/*', wrap(entitiesHandler, 'entities'));
-app.all('/api/users', wrap(usersHandler, 'users'));
-app.all('/api/users/*', wrap(usersHandler, 'users'));
-app.all('/api/settings', wrap(settingsHandler, 'settings'));
-app.all('/api/settings/*', wrap(settingsHandler, 'settings'));
-app.all('/api/datarows', wrap(datarowsHandler, 'datarows'));
-app.all('/api/datarows/*', wrap(datarowsHandler, 'datarows'));
-app.all('/api/files', wrap(filesHandler, 'files'));
-app.all('/api/files/*', wrap(filesHandler, 'files'));
+// The client hits fixed base paths with a `path` query param (Vercel-safe),
+// but we also keep the /* variants for any direct calls.
+const mount = (name, h) => { app.all(`/api/${name}`, wrap(h, name)); app.all(`/api/${name}/*`, wrap(h, name)); };
+mount('auth', authHandler);
+mount('entities', entitiesHandler);
+mount('users', usersHandler);
+mount('settings', settingsHandler);
+mount('datarows', datarowsHandler);
+mount('files', filesHandler);
 
 const port = process.env.API_PORT || 3001;
 app.listen(port, () => console.log(`\n  ⚡ Neurix API (dev) → http://localhost:${port}\n`));
