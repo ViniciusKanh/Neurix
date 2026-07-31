@@ -59,9 +59,32 @@ async function main() {
     )`,
     `CREATE INDEX IF NOT EXISTS idx_records_type ON records(entity_type)`,
     `CREATE INDEX IF NOT EXISTS idx_records_type_created ON records(entity_type, created_date)`,
+    `CREATE TABLE IF NOT EXISTS tokens (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      kind TEXT NOT NULL,            -- 'verify' | 'reset'
+      token TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      created_date TEXT NOT NULL
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_tokens_token ON tokens(token)`,
+    `CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT
+    )`,
   ], 'write');
 
-  console.log('✓ Tabelas prontas: users, files, records');
+  // Add 'status' column to users if it doesn't exist yet (idempotent).
+  try {
+    await db.execute(`ALTER TABLE users ADD COLUMN status TEXT DEFAULT 'active'`);
+    console.log('✓ Coluna users.status adicionada');
+  } catch {
+    // already exists
+  }
+  // Ensure existing users are marked active.
+  await db.execute(`UPDATE users SET status = 'active' WHERE status IS NULL OR status = ''`);
+
+  console.log('✓ Tabelas prontas: users, files, records, tokens, settings');
 
   // Seed admin ---------------------------------------------------------------
   const existing = await db.execute({

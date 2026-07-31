@@ -6,7 +6,7 @@ config();
 
 import express from 'express';
 import {
-  authHandler, entitiesHandler, usersHandler, filesHandler,
+  authHandler, entitiesHandler, usersHandler, filesHandler, settingsHandler,
 } from './api/_lib/handlers.js';
 import { makeCtx } from './api/_lib/adapter.js';
 
@@ -27,6 +27,8 @@ app.all('/api/auth/*', wrap(authHandler, 'auth'));
 app.all('/api/entities/*', wrap(entitiesHandler, 'entities'));
 app.all('/api/users', wrap(usersHandler, 'users'));
 app.all('/api/users/*', wrap(usersHandler, 'users'));
+app.all('/api/settings', wrap(settingsHandler, 'settings'));
+app.all('/api/settings/*', wrap(settingsHandler, 'settings'));
 app.all('/api/files', wrap(filesHandler, 'files'));
 app.all('/api/files/*', wrap(filesHandler, 'files'));
 

@@ -1,16 +1,16 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/lib/AuthContext';
-import { base44 } from '@/api/base44Client';
+import { base44, settingsApi } from '@/api/base44Client';
 import PageHeader from '@/components/ui/PageHeader';
 import {
   User as UserIcon, Shield, Database, Camera, Loader2, Check,
-  KeyRound, ShieldCheck, ShieldOff, Palette,
+  KeyRound, ShieldCheck, ShieldOff, Palette, Mail, Send,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { THEMES, applyTheme, getThemeId } from '@/lib/theme';
 import { ModaraLogoMark } from '@/components/layout/ModaraLogo';
 
-const TABS = [
+const BASE_TABS = [
   { key: 'profile', label: 'Perfil', icon: UserIcon },
   { key: 'appearance', label: 'Aparência', icon: Palette },
   { key: 'security', label: 'Segurança', icon: Shield },
@@ -22,6 +22,11 @@ export default function Settings() {
   const [tab, setTab] = useState('profile');
 
   if (!user) return null;
+
+  const isAdmin = user.role === 'admin';
+  const TABS = isAdmin
+    ? [...BASE_TABS.slice(0, 3), { key: 'email', label: 'Email', icon: Mail }, ...BASE_TABS.slice(3)]
+    : BASE_TABS;
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -46,6 +51,7 @@ export default function Settings() {
 
       {tab === 'profile' && <ProfileTab user={user} setUser={setUser} refreshUser={refreshUser} />}
       {tab === 'appearance' && <AppearanceTab />}
+      {tab === 'email' && isAdmin && <EmailTab />}
       {tab === 'security' && <SecurityTab user={user} refreshUser={refreshUser} />}
       {tab === 'connection' && <ConnectionTab />}
     </div>
@@ -325,6 +331,90 @@ function TwoFactorCard({ user, refreshUser }) {
         </button>
       )}
     </Card>
+  );
+}
+
+// ---------------------------------------------------------------- Email (admin)
+function EmailTab() {
+  const [cfg, setCfg] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testTo, setTestTo] = useState('');
+
+  useEffect(() => {
+    settingsApi.getEmail()
+      .then((c) => setCfg({ enabled: false, host: 'smtp.gmail.com', port: 465, from_name: 'Neurix', user: '', pass: '', ...c }))
+      .catch((e) => toast.error(e.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const set = (k, v) => setCfg((c) => ({ ...c, [k]: v }));
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const saved = await settingsApi.saveEmail(cfg);
+      setCfg((c) => ({ ...c, ...saved }));
+      toast.success('Configuração de e-mail salva');
+    } catch (e) { toast.error(e.message); } finally { setSaving(false); }
+  };
+
+  const test = async () => {
+    setTesting(true);
+    try {
+      await settingsApi.testEmail({ ...cfg, to: testTo || undefined });
+      toast.success('E-mail de teste enviado! Verifique a caixa de entrada.');
+    } catch (e) { toast.error(e.message); } finally { setTesting(false); }
+  };
+
+  if (loading) return <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
+
+  return (
+    <>
+      <Card title="Servidor de e-mail (SMTP)" desc="Usado para confirmação de cadastro, redefinição de senha e alertas. Com o Gmail, gere uma 'senha de app' em myaccount.google.com/apppasswords e cole abaixo.">
+        <label className="flex items-center gap-2 text-sm text-foreground mb-4">
+          <input type="checkbox" checked={cfg.enabled} onChange={(e) => set('enabled', e.target.checked)} className="accent-primary" />
+          Ativar envio de e-mails
+        </label>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Host SMTP</label>
+            <input className={`${field} mt-1`} value={cfg.host} onChange={(e) => set('host', e.target.value)} placeholder="smtp.gmail.com" />
+          </div>
+          <div>
+            <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Porta</label>
+            <input className={`${field} mt-1`} value={cfg.port} onChange={(e) => set('port', e.target.value)} placeholder="465" />
+          </div>
+          <div>
+            <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">E-mail (usuário)</label>
+            <input className={`${field} mt-1`} value={cfg.user} onChange={(e) => set('user', e.target.value)} placeholder="voce@gmail.com" />
+          </div>
+          <div>
+            <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Senha de app</label>
+            <input type="password" className={`${field} mt-1`} value={cfg.pass} onChange={(e) => set('pass', e.target.value)} placeholder="•••• •••• •••• ••••" />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Nome do remetente</label>
+            <input className={`${field} mt-1`} value={cfg.from_name} onChange={(e) => set('from_name', e.target.value)} placeholder="Neurix" />
+          </div>
+        </div>
+
+        <button onClick={save} disabled={saving} className={`${btn} mt-4`}>
+          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Salvar configuração
+        </button>
+      </Card>
+
+      <Card title="Testar envio" desc="Envie um e-mail de teste para confirmar que está tudo certo.">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <input className={field} value={testTo} onChange={(e) => setTestTo(e.target.value)} placeholder="destinatário (opcional — padrão: seu e-mail)" />
+          <button onClick={test} disabled={testing} className={btn}>
+            {testing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} Enviar teste
+          </button>
+        </div>
+      </Card>
+    </>
   );
 }
 

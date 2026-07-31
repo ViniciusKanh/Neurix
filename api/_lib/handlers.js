@@ -5,7 +5,39 @@ import {
 } from './util.js';
 import { currentUserRow, serializeUser } from './auth.js';
 
+import crypto from 'crypto';
+
 const bad = (res, status, message) => json(res, status, { error: message });
+
+// Builds the app's base URL from the incoming request (works on Vercel + dev).
+function getBaseUrl(req) {
+  const origin = req.headers?.origin;
+  if (origin) return origin.replace(/\/$/, '');
+  const host = req.headers?.['x-forwarded-host'] || req.headers?.host || 'localhost:5173';
+  const proto = req.headers?.['x-forwarded-proto'] || (host.includes('localhost') ? 'http' : 'https');
+  return `${proto}://${host}`;
+}
+
+async function createToken(userId, kind, ttlMs) {
+  const token = crypto.randomBytes(24).toString('hex');
+  const id = newId();
+  const now = Date.now();
+  await run(
+    'INSERT INTO tokens (id, user_id, kind, token, expires_at, created_date) VALUES (?,?,?,?,?,?)',
+    [id, userId, kind, token, new Date(now + ttlMs).toISOString(), new Date(now).toISOString()]
+  );
+  return token;
+}
+
+// Validates a token, deletes it (single-use), and returns the row if valid.
+async function consumeToken(token, kind) {
+  if (!token) return null;
+  const row = await queryOne('SELECT * FROM tokens WHERE token = ? AND kind = ?', [token, kind]);
+  if (!row) return null;
+  await run('DELETE FROM tokens WHERE id = ?', [row.id]);
+  if (new Date(row.expires_at).getTime() < Date.now()) return null;
+  return row;
+}
 
 // =====================================================================
 // AUTH  ->  /api/auth/*
@@ -32,6 +64,10 @@ export async function authHandler(req, res, ctx) {
     const ok = await verifyPassword(body.password || '', row.password_hash);
     if (!ok) return bad(res, 401, 'Credenciais inválidas');
 
+    if (row.status && row.status !== 'active') {
+      return bad(res, 403, 'Confirme seu e-mail antes de entrar. Verifique sua caixa de entrada.');
+    }
+
     if (row.totp_enabled) {
       const challenge = signToken({ sub: row.id, purpose: '2fa' }, '10m');
       return json(res, 200, { requires_2fa: true, challenge });
@@ -50,6 +86,97 @@ export async function authHandler(req, res, ctx) {
     if (!verifyTotp(row.totp_secret, body.code)) return bad(res, 401, 'Código 2FA inválido');
     const token = signToken({ sub: row.id });
     return json(res, 200, { token, user: serializeUser(row) });
+  }
+
+  // GET /api/auth/config -> tells the login page which flows are available
+  if (seg0 === 'config' && method === 'GET') {
+    const { getEmailConfig } = await import('./mailer.js');
+    const cfg = await getEmailConfig();
+    return json(res, 200, { email_enabled: !!(cfg && cfg.enabled && cfg.user) });
+  }
+
+  // POST /api/auth/register  { email, full_name, password }
+  if (seg0 === 'register' && method === 'POST') {
+    const email = (body.email || '').trim().toLowerCase();
+    if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return bad(res, 400, 'E-mail inválido');
+    if (!body.password || body.password.length < 6) return bad(res, 400, 'Senha muito curta (mín. 6)');
+
+    const { getEmailConfig, sendEmail } = await import('./mailer.js');
+    const cfg = await getEmailConfig();
+    if (!cfg || !cfg.enabled || !cfg.user) return bad(res, 503, 'Cadastro indisponível: o administrador ainda não configurou o envio de e-mails.');
+
+    const existing = await queryOne('SELECT * FROM users WHERE email = ?', [email]);
+    if (existing && existing.status === 'active') return bad(res, 409, 'E-mail já cadastrado. Tente entrar ou redefinir a senha.');
+
+    let userId;
+    const ts = nowISO();
+    if (existing) {
+      userId = existing.id;
+      await run('UPDATE users SET full_name = ?, password_hash = ?, updated_date = ? WHERE id = ?',
+        [body.full_name || existing.full_name, await hashPassword(body.password), ts, userId]);
+    } else {
+      userId = newId();
+      const BASIC = ['dashboard', 'projects', 'explorer', 'ml-studio', 'reports', 'deploy'];
+      await run(
+        `INSERT INTO users (id, email, full_name, password_hash, role, permissions, status, is_active, created_date, updated_date)
+         VALUES (?,?,?,?,?,?,'pending',1,?,?)`,
+        [userId, email, body.full_name || '', await hashPassword(body.password), 'user', JSON.stringify(BASIC), ts, ts]
+      );
+    }
+
+    const token = await createToken(userId, 'verify', 24 * 60 * 60 * 1000);
+    const link = `${getBaseUrl(req)}/?verify=${token}`;
+    const { verifyEmailTemplate } = await import('./emailTemplates.js');
+    const t = verifyEmailTemplate({ name: body.full_name, link });
+    try {
+      await sendEmail({ to: email, subject: t.subject, html: t.html });
+    } catch (e) {
+      return bad(res, 500, `Não foi possível enviar o e-mail de confirmação: ${e.message}`);
+    }
+    return json(res, 200, { ok: true, pending: true });
+  }
+
+  // POST /api/auth/verify-email  { token }
+  if (seg0 === 'verify-email' && method === 'POST') {
+    const row = await consumeToken(body.token, 'verify');
+    if (!row) return bad(res, 400, 'Link inválido ou expirado.');
+    await run("UPDATE users SET status = 'active', updated_date = ? WHERE id = ?", [nowISO(), row.user_id]);
+    const user = await queryOne('SELECT * FROM users WHERE id = ?', [row.user_id]);
+    try {
+      const { sendEmail } = await import('./mailer.js');
+      const { welcomeTemplate } = await import('./emailTemplates.js');
+      const t = welcomeTemplate({ name: user?.full_name, appUrl: getBaseUrl(req) });
+      await sendEmail({ to: user.email, subject: t.subject, html: t.html });
+    } catch { /* best-effort */ }
+    return json(res, 200, { ok: true, email: user?.email });
+  }
+
+  // POST /api/auth/forgot  { email }
+  if (seg0 === 'forgot' && method === 'POST') {
+    const email = (body.email || '').trim().toLowerCase();
+    const { getEmailConfig, sendEmail } = await import('./mailer.js');
+    const cfg = await getEmailConfig();
+    if (!cfg || !cfg.enabled || !cfg.user) return bad(res, 503, 'Redefinição indisponível: e-mail não configurado pelo administrador.');
+    const user = await queryOne('SELECT * FROM users WHERE email = ?', [email]);
+    // Always respond ok to avoid leaking which e-mails exist.
+    if (user && user.is_active) {
+      const token = await createToken(user.id, 'reset', 60 * 60 * 1000);
+      const link = `${getBaseUrl(req)}/?reset=${token}`;
+      const { resetPasswordTemplate } = await import('./emailTemplates.js');
+      const t = resetPasswordTemplate({ name: user.full_name, link });
+      try { await sendEmail({ to: email, subject: t.subject, html: t.html }); } catch { /* ignore */ }
+    }
+    return json(res, 200, { ok: true });
+  }
+
+  // POST /api/auth/reset  { token, password }
+  if (seg0 === 'reset' && method === 'POST') {
+    if (!body.password || body.password.length < 6) return bad(res, 400, 'Senha muito curta (mín. 6)');
+    const row = await consumeToken(body.token, 'reset');
+    if (!row) return bad(res, 400, 'Link inválido ou expirado.');
+    await run('UPDATE users SET password_hash = ?, updated_date = ? WHERE id = ?',
+      [await hashPassword(body.password), nowISO(), row.user_id]);
+    return json(res, 200, { ok: true });
   }
 
   // Everything below requires a logged-in user
@@ -284,6 +411,47 @@ export async function usersHandler(req, res, ctx) {
   }
 
   return bad(res, 404, 'Rota de usuários não encontrada');
+}
+
+// =====================================================================
+// SETTINGS  ->  /api/settings/*   (admin only)
+// =====================================================================
+export async function settingsHandler(req, res, ctx) {
+  const me = await currentUserRow(req);
+  if (!me) return bad(res, 401, 'Não autenticado');
+  if (me.role !== 'admin') return bad(res, 403, 'Apenas administradores');
+
+  const { segments, method, body } = ctx;
+  const { getEmailConfig, saveEmailConfig, maskEmailConfig, sendTestEmail } = await import('./mailer.js');
+
+  // /api/settings/email
+  if (segments[0] === 'email') {
+    // /api/settings/email/test
+    if (segments[1] === 'test' && method === 'POST') {
+      const cfg = { ...(await getEmailConfig()), ...body };
+      if ((!cfg.pass || cfg.pass === '••••••••')) {
+        const stored = await getEmailConfig();
+        if (stored?.pass) cfg.pass = stored.pass;
+      }
+      if (!cfg.user || !cfg.pass) return bad(res, 400, 'Preencha usuário e senha de app antes de testar.');
+      try {
+        await sendTestEmail(cfg, body.to || me.email);
+        return json(res, 200, { ok: true });
+      } catch (e) {
+        return bad(res, 500, `Falha no envio: ${e.message}`);
+      }
+    }
+
+    if (method === 'GET') {
+      return json(res, 200, maskEmailConfig(await getEmailConfig()) || { enabled: false, host: 'smtp.gmail.com', port: 465, from_name: 'Neurix', user: '', pass: '' });
+    }
+    if (method === 'POST' || method === 'PUT') {
+      const saved = await saveEmailConfig(body);
+      return json(res, 200, maskEmailConfig(saved));
+    }
+  }
+
+  return bad(res, 404, 'Rota de configurações não encontrada');
 }
 
 // =====================================================================

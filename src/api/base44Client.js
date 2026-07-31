@@ -67,8 +67,13 @@ const entities = new Proxy({}, { get: (_t, name) => makeEntity(String(name)) });
 // ---- Auth -----------------------------------------------------------------
 const auth = {
   me: () => api('/auth/me'),
+  config: () => api('/auth/config'),
   login: (email, password) => api('/auth/login', { method: 'POST', body: { email, password } }),
   verify2FA: (challenge, code) => api('/auth/verify-2fa', { method: 'POST', body: { challenge, code } }),
+  register: (data) => api('/auth/register', { method: 'POST', body: data }),
+  verifyEmail: (token) => api('/auth/verify-email', { method: 'POST', body: { token } }),
+  forgotPassword: (email) => api('/auth/forgot', { method: 'POST', body: { email } }),
+  resetPassword: (token, password) => api('/auth/reset', { method: 'POST', body: { token, password } }),
   setup2FA: () => api('/auth/2fa/setup', { method: 'POST' }),
   enable2FA: (code) => api('/auth/2fa/enable', { method: 'POST', body: { code } }),
   disable2FA: (code) => api('/auth/2fa/disable', { method: 'POST', body: { code } }),
@@ -76,6 +81,13 @@ const auth = {
   updateProfile: (data) => api('/auth/profile', { method: 'POST', body: data }),
   logout: () => { tokenStore.clear(); },
   redirectToLogin: () => { tokenStore.clear(); if (typeof window !== 'undefined') window.location.assign('/'); },
+};
+
+// ---- Email/SMTP settings (admin) -----------------------------------------
+export const settingsApi = {
+  getEmail: () => api('/settings/email'),
+  saveEmail: (cfg) => api('/settings/email', { method: 'POST', body: cfg }),
+  testEmail: (cfg) => api('/settings/email/test', { method: 'POST', body: cfg }),
 };
 
 // ---- User management (admin) ---------------------------------------------
