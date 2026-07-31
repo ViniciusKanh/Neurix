@@ -1,0 +1,102 @@
+{
+  "name": "PipelineExecution",
+  "type": "object",
+  "properties": {
+    "pipeline_id": {
+      "type": "string"
+    },
+    "pipeline_name": {
+      "type": "string"
+    },
+    "trigger": {
+      "type": "string",
+      "enum": [
+        "manual",
+        "scheduled",
+        "rerun"
+      ],
+      "default": "manual"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "running",
+        "success",
+        "failed",
+        "timeout"
+      ],
+      "default": "pending"
+    },
+    "started_at": {
+      "type": "string"
+    },
+    "finished_at": {
+      "type": "string"
+    },
+    "duration_seconds": {
+      "type": "number"
+    },
+    "total_nodes": {
+      "type": "number"
+    },
+    "completed_nodes": {
+      "type": "number"
+    },
+    "failed_node": {
+      "type": "string"
+    },
+    "error_message": {
+      "type": "string"
+    },
+    "node_logs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "node_id": {
+            "type": "string"
+          },
+          "node_name": {
+            "type": "string"
+          },
+          "node_type": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "started_at": {
+            "type": "string"
+          },
+          "finished_at": {
+            "type": "string"
+          },
+          "duration_ms": {
+            "type": "number"
+          },
+          "rows_in": {
+            "type": "number"
+          },
+          "rows_out": {
+            "type": "number"
+          },
+          "log": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "pipeline_snapshot": {
+      "type": "object"
+    }
+  },
+  "required": [
+    "pipeline_id",
+    "pipeline_name",
+    "status"
+  ]
+}

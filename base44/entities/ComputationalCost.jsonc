@@ -1,0 +1,66 @@
+{
+  "name": "ComputationalCost",
+  "type": "object",
+  "properties": {
+    "project_id": {
+      "type": "string"
+    },
+    "project_name": {
+      "type": "string"
+    },
+    "operation_type": {
+      "type": "string",
+      "enum": [
+        "automl",
+        "deployment",
+        "analysis",
+        "monitoring",
+        "association_rules",
+        "visualization",
+        "report",
+        "ai_chat"
+      ]
+    },
+    "operation_name": {
+      "type": "string"
+    },
+    "estimated_tokens": {
+      "type": "number",
+      "default": 0
+    },
+    "input_tokens": {
+      "type": "number",
+      "default": 0
+    },
+    "output_tokens": {
+      "type": "number",
+      "default": 0
+    },
+    "estimated_cost_usd": {
+      "type": "number",
+      "default": 0
+    },
+    "duration_seconds": {
+      "type": "number",
+      "default": 0
+    },
+    "model_used": {
+      "type": "string",
+      "default": "gpt-4o-mini"
+    },
+    "dataset_rows": {
+      "type": "number"
+    },
+    "dataset_columns": {
+      "type": "number"
+    },
+    "metadata": {
+      "type": "object"
+    }
+  },
+  "required": [
+    "project_id",
+    "operation_type",
+    "operation_name"
+  ]
+}

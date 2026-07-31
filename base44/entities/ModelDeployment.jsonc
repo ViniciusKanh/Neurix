@@ -1,0 +1,83 @@
+{
+  "name": "ModelDeployment",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "project_id": {
+      "type": "string"
+    },
+    "project_name": {
+      "type": "string"
+    },
+    "analysis_id": {
+      "type": "string"
+    },
+    "model_name": {
+      "type": "string"
+    },
+    "task_type": {
+      "type": "string"
+    },
+    "target_column": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "inactive",
+        "deploying"
+      ],
+      "default": "active"
+    },
+    "endpoint_url": {
+      "type": "string"
+    },
+    "api_keys": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "model_metrics": {
+      "type": "object"
+    },
+    "input_schema": {
+      "type": "object"
+    },
+    "output_schema": {
+      "type": "object"
+    },
+    "call_logs": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "total_calls": {
+      "type": "number",
+      "default": 0
+    },
+    "calls_today": {
+      "type": "number",
+      "default": 0
+    },
+    "avg_latency_ms": {
+      "type": "number"
+    },
+    "error_rate": {
+      "type": "number",
+      "default": 0
+    },
+    "description": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "project_id",
+    "model_name"
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "name": "AssociationAnalysis",
+  "type": "object",
+  "properties": {
+    "project_id": {
+      "type": "string"
+    },
+    "project_name": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "algorithms": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "min_support": {
+      "type": "number"
+    },
+    "min_confidence": {
+      "type": "number"
+    },
+    "min_lift": {
+      "type": "number"
+    },
+    "max_rule_len": {
+      "type": "number"
+    },
+    "total_rules": {
+      "type": "number"
+    },
+    "high_quality_rules": {
+      "type": "number"
+    },
+    "avg_lift": {
+      "type": "number"
+    },
+    "avg_confidence": {
+      "type": "number"
+    },
+    "avg_support": {
+      "type": "number"
+    },
+    "result": {
+      "type": "object",
+      "description": "Full analysis result"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "project_id",
+    "name"
+  ]
+}

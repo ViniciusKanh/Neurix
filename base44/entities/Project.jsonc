@@ -1,0 +1,141 @@
+{
+  "name": "Project",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Project name"
+    },
+    "description": {
+      "type": "string",
+      "description": "Project description"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "exploring",
+        "modeling",
+        "completed"
+      ],
+      "default": "draft"
+    },
+    "dataset_file_url": {
+      "type": "string",
+      "description": "URL of the uploaded dataset file"
+    },
+    "dataset_filename": {
+      "type": "string",
+      "description": "Original filename"
+    },
+    "dataset_size": {
+      "type": "number",
+      "description": "Number of rows"
+    },
+    "dataset_columns": {
+      "type": "number",
+      "description": "Number of columns"
+    },
+    "column_info": {
+      "type": "array",
+      "description": "Column metadata",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "unique_count": {
+            "type": "number"
+          },
+          "null_percent": {
+            "type": "number"
+          },
+          "sample_values": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "data_sample": {
+      "type": "array",
+      "description": "First rows of data for preview",
+      "items": {
+        "type": "object"
+      }
+    },
+    "ai_diagnosis": {
+      "type": "string",
+      "description": "AI-generated data quality diagnosis"
+    },
+    "ai_suggestions": {
+      "type": "array",
+      "description": "AI task suggestions",
+      "items": {
+        "type": "object",
+        "properties": {
+          "task": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "confidence": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "prep_steps": {
+      "type": "array",
+      "description": "Data preprocessing step history",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "config": {
+            "type": "object"
+          },
+          "applied_at": {
+            "type": "string"
+          },
+          "affected_rows": {
+            "type": "number"
+          },
+          "affected_columns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "summary": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "name"
+  ]
+}

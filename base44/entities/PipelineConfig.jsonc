@@ -1,0 +1,60 @@
+{
+  "name": "PipelineConfig",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "project_id": {
+      "type": "string"
+    },
+    "project_name": {
+      "type": "string"
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "feature_store_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "operation_type": {
+            "type": "string"
+          },
+          "feature_type": {
+            "type": "string"
+          },
+          "config": {
+            "type": "object"
+          },
+          "order": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "is_template": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "required": [
+    "name"
+  ]
+}

@@ -1,0 +1,109 @@
+{
+  "name": "ApprovalRequest",
+  "type": "object",
+  "properties": {
+    "type": {
+      "type": "string",
+      "enum": [
+        "pipeline_change",
+        "new_deployment",
+        "model_update",
+        "config_change"
+      ],
+      "description": "Tipo de altera\u00e7\u00e3o que requer aprova\u00e7\u00e3o"
+    },
+    "title": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "project_id": {
+      "type": "string"
+    },
+    "project_name": {
+      "type": "string"
+    },
+    "resource_id": {
+      "type": "string",
+      "description": "ID do pipeline, deploy ou modelo relacionado"
+    },
+    "resource_name": {
+      "type": "string"
+    },
+    "requested_by": {
+      "type": "string",
+      "description": "Email do solicitante"
+    },
+    "requested_by_name": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "approved",
+        "rejected",
+        "cancelled"
+      ],
+      "default": "pending"
+    },
+    "priority": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ],
+      "default": "medium"
+    },
+    "approved_by": {
+      "type": "string",
+      "description": "Email do aprovador"
+    },
+    "approved_by_name": {
+      "type": "string"
+    },
+    "approved_at": {
+      "type": "string",
+      "description": "ISO timestamp da aprova\u00e7\u00e3o/rejei\u00e7\u00e3o"
+    },
+    "approval_reason": {
+      "type": "string",
+      "description": "Justificativa do aprovador"
+    },
+    "rejection_reason": {
+      "type": "string"
+    },
+    "electronic_signature": {
+      "type": "string",
+      "description": "Assinatura eletr\u00f4nica (hash/texto confirmado)"
+    },
+    "diff_summary": {
+      "type": "string",
+      "description": "Resumo t\u00e9cnico das mudan\u00e7as propostas"
+    },
+    "impact_assessment": {
+      "type": "string",
+      "description": "Avalia\u00e7\u00e3o de impacto"
+    },
+    "audit_log": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      },
+      "description": "Hist\u00f3rico completo de a\u00e7\u00f5es"
+    },
+    "expires_at": {
+      "type": "string",
+      "description": "Prazo de validade da solicita\u00e7\u00e3o"
+    }
+  },
+  "required": [
+    "type",
+    "title",
+    "requested_by",
+    "status"
+  ]
+}

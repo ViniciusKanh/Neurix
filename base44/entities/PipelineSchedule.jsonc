@@ -1,0 +1,59 @@
+{
+  "name": "PipelineSchedule",
+  "type": "object",
+  "properties": {
+    "pipeline_id": {
+      "type": "string"
+    },
+    "pipeline_name": {
+      "type": "string"
+    },
+    "cron_expression": {
+      "type": "string",
+      "description": "Cron expression e.g. 0 9 * * 1-5"
+    },
+    "cron_label": {
+      "type": "string",
+      "description": "Human-readable description"
+    },
+    "enabled": {
+      "type": "boolean",
+      "default": true
+    },
+    "notify_email": {
+      "type": "string"
+    },
+    "notify_on_success": {
+      "type": "boolean",
+      "default": false
+    },
+    "notify_on_failure": {
+      "type": "boolean",
+      "default": true
+    },
+    "timeout_minutes": {
+      "type": "number",
+      "default": 30
+    },
+    "last_run_at": {
+      "type": "string"
+    },
+    "next_run_at": {
+      "type": "string"
+    },
+    "last_status": {
+      "type": "string",
+      "enum": [
+        "success",
+        "failed",
+        "running",
+        "pending"
+      ]
+    }
+  },
+  "required": [
+    "pipeline_id",
+    "pipeline_name",
+    "cron_expression"
+  ]
+}

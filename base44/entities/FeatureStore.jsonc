@@ -1,0 +1,101 @@
+{
+  "name": "FeatureStore",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Feature name"
+    },
+    "display_name": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string",
+      "default": "1.0.0"
+    },
+    "feature_type": {
+      "type": "string",
+      "enum": [
+        "numeric",
+        "categorical",
+        "boolean",
+        "datetime",
+        "text",
+        "embedding"
+      ]
+    },
+    "operation_type": {
+      "type": "string"
+    },
+    "formula": {
+      "type": "string",
+      "description": "Transformation formula/logic"
+    },
+    "config": {
+      "type": "object",
+      "description": "Operation configuration"
+    },
+    "source_columns": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "source_project_id": {
+      "type": "string"
+    },
+    "source_project_name": {
+      "type": "string"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "is_public": {
+      "type": "boolean",
+      "default": true
+    },
+    "usage_count": {
+      "type": "number",
+      "default": 0
+    },
+    "used_in_projects": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Project IDs that use this feature"
+    },
+    "sample_values": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "statistics": {
+      "type": "object"
+    },
+    "lineage": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "versions": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    }
+  },
+  "required": [
+    "name",
+    "feature_type",
+    "operation_type"
+  ]
+}

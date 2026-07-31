@@ -1,0 +1,60 @@
+{
+  "name": "Analysis",
+  "type": "object",
+  "properties": {
+    "project_id": {
+      "type": "string",
+      "description": "Reference to project"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "classification",
+        "regression",
+        "clustering",
+        "association_rules",
+        "anomaly_detection",
+        "dimensionality_reduction",
+        "exploration"
+      ],
+      "description": "Type of analysis"
+    },
+    "name": {
+      "type": "string",
+      "description": "Analysis name"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "running",
+        "completed",
+        "failed"
+      ],
+      "default": "pending"
+    },
+    "config": {
+      "type": "object",
+      "description": "Analysis configuration parameters"
+    },
+    "results": {
+      "type": "object",
+      "description": "Analysis results including metrics, charts data, insights"
+    },
+    "ai_interpretation": {
+      "type": "string",
+      "description": "AI interpretation of results"
+    },
+    "ai_recommendations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "project_id",
+    "type",
+    "name"
+  ]
+}
