@@ -345,9 +345,14 @@ export async function entitiesHandler(req, res, ctx) {
     if (method === 'DELETE') {
       if (!existing) return bad(res, 404, 'Registro não encontrado');
       await run('DELETE FROM records WHERE id = ? AND entity_type = ? AND created_by_id = ?', [id, type, owner]);
-      // Cascade: deleting a project also removes its stored dataset rows.
+      // Cascade: deleting a project removes ALL related data (analyses, models,
+      // prediction logs, association analyses, pipelines, costs, approvals…) and
+      // the stored dataset rows — everything tied to this project_id.
       if (type === 'Project') {
-        try { await run('DELETE FROM dataset_rows WHERE project_id = ? AND owner_id = ?', [id, owner]); } catch { /* ignore */ }
+        try {
+          await run('DELETE FROM dataset_rows WHERE project_id = ? AND owner_id = ?', [id, owner]);
+          await run("DELETE FROM records WHERE created_by_id = ? AND json_extract(data, '$.project_id') = ?", [owner, id]);
+        } catch (e) { /* non-fatal cascade */ }
       }
       return json(res, 200, { ok: true });
     }
