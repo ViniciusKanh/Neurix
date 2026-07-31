@@ -69,13 +69,30 @@ export default function Deploy() {
     if (!model || !project) return;
     setRunning(true);
     const t0 = performance.now();
-    await new Promise((r) => setTimeout(r, 500));
-    const pred = predictLocally(model, project, inputs);
+    let pred = null;
+    let mode = 'heurística';
+    try {
+      // Real prediction: reload the local dataset, retrain the chosen model, predict.
+      const { getDataset } = await import('@/lib/datasetStore');
+      const d = await getDataset(project.id);
+      if (d && d.rows && d.rows.length >= 10 && ['classification', 'regression'].includes(model.type)) {
+        const { trainPredictor } = await import('@/lib/realML');
+        const predictor = trainPredictor(d.rows, targetCol, project.column_info, model.type, model.results?.best_model);
+        if (predictor) {
+          const out = predictor.predict(inputs);
+          const conf = model.type === 'classification' ? (model.results?.metrics?.accuracy ?? null) : null;
+          pred = { predicted: out.value, confidence: conf };
+          mode = 'modelo real';
+        }
+      }
+    } catch (e) { console.warn('[Deploy] preditor real indisponível, usando heurística:', e.message); }
+
+    if (!pred) { await new Promise((r) => setTimeout(r, 300)); pred = predictLocally(model, project, inputs); }
     const latency = Math.round(performance.now() - t0);
-    setPrediction({ ...pred, latency });
+    setPrediction({ ...pred, latency, mode });
     setLog((l) => [{ time: new Date().toLocaleTimeString('pt-BR'), predicted: pred.predicted, latency }, ...l].slice(0, 8));
     setRunning(false);
-    toast.success('Predição executada');
+    toast.success(mode === 'modelo real' ? 'Predição com modelo real!' : 'Predição executada (heurística — recarregue o dataset p/ modelo real).');
   };
 
   const metrics = model?.results?.metrics || {};
@@ -189,6 +206,9 @@ export default function Deploy() {
                 <div className="flex items-center gap-2 mb-3">
                   <CheckCircle2 className="w-4 h-4 text-accent" />
                   <h3 className="font-semibold text-foreground text-sm">Resposta do modelo</h3>
+                  <span className={`ml-auto text-[10px] px-2 py-0.5 rounded-full font-semibold ${prediction.mode === 'modelo real' ? 'bg-accent/15 text-accent' : 'bg-amber-400/15 text-amber-400'}`}>
+                    {prediction.mode === 'modelo real' ? '✓ modelo real' : '~ heurística'}
+                  </span>
                 </div>
                 <div className="flex flex-wrap items-end gap-6">
                   <div>

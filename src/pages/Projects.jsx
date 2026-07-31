@@ -25,6 +25,7 @@ export default function Projects() {
     e.preventDefault();
     e.stopPropagation();
     await base44.entities.Project.delete(id);
+    try { const { deleteDataset } = await import('@/lib/datasetStore'); await deleteDataset(id); } catch { /* ignore */ }
     queryClient.invalidateQueries({ queryKey: ['projects'] });
   };
 

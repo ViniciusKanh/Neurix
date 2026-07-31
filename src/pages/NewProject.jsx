@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { parseAnyFile } from '@/lib/parseDataset';
-import { base44, datarowsApi } from '@/api/base44Client';
+import { base44 } from '@/api/base44Client';
 import { useNavigate } from 'react-router-dom';
 import { Upload, FileSpreadsheet, ArrowRight, Loader2, Database } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -111,34 +111,18 @@ export default function NewProject() {
       return toast.error(`Não foi possível criar o projeto: ${err.message}`);
     }
 
-    // Upload ALL rows in batches for real full-dataset training.
-    const allRows = file && parsedRows ? parsedRows : [];
+    // WEKA-style: keep the FULL dataset locally (IndexedDB), never in Turso.
+    const allRows = parsedRows || [];
     if (allRows.length > 0) {
-      const BATCH = 500;
-      let stored = 0;
-      let limitHit = false;
-      setProgressMsg('Armazenando linhas para treino...');
-      for (let i = 0; i < allRows.length; i += BATCH) {
-        const chunk = allRows.slice(i, i + BATCH);
-        try {
-          await datarowsApi.append(project.id, chunk, i);
-          stored += chunk.length;
-          setProgress(Math.round((stored / allRows.length) * 100));
-        } catch (err) {
-          console.error('[NewProject] falha ao salvar linhas em dataset_rows:', err, err.data);
-          const code = err.data?.code;
-          if (code === 'DB_LIMIT' || code === 'ROW_LIMIT') {
-            limitHit = true;
-            toast.error(`Banco atingiu o limite — o projeto ficou com ${stored.toLocaleString('pt-BR')} de ${allRows.length.toLocaleString('pt-BR')} linhas. As análises usarão o que coube.`);
-          } else {
-            toast.error(`Não foi possível armazenar as linhas (${err.message}). Rode "npm run db:migrate" e reinicie o servidor. Projeto criado com ${stored.toLocaleString('pt-BR')} linhas.`);
-          }
-          break;
-        }
+      try {
+        const { saveDataset } = await import('@/lib/datasetStore');
+        await saveDataset(project.id, allRows, projectData.column_info || [], { filename: file?.name, size: projectData.dataset_size });
+        await base44.entities.Project.update(project.id, { rows_stored: allRows.length, dataset_local: true });
+        toast.success(`${allRows.length.toLocaleString('pt-BR')} linhas carregadas localmente (treino real).`);
+      } catch (e) {
+        console.error('[NewProject] falha ao salvar dataset local (IndexedDB):', e);
+        toast.error('Não foi possível salvar o dataset localmente. As análises usarão a amostra.');
       }
-      // record how many rows were actually persisted
-      try { await base44.entities.Project.update(project.id, { rows_stored: stored }); } catch { /* non-fatal */ }
-      if (!limitHit && stored === allRows.length) toast.success(`${stored.toLocaleString('pt-BR')} linhas armazenadas para treino real.`);
     }
 
     toast.success('Projeto criado com sucesso!');

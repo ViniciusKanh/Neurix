@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -15,7 +15,8 @@ import { Brain, Play, Loader2, GitCompare, Settings2, Trash2, Wrench, Pencil } f
 
 import { runClassification, runRegression, runClustering, runAnomalyDetection, runDimReduction, runFeatureSelection } from '@/lib/localML';
 import { runRealClassification, runRealRegression, runRealClustering } from '@/lib/realML';
-import { datarowsApi } from '@/api/base44Client';
+import { getDataset, saveDataset, hasDataset } from '@/lib/datasetStore';
+import { parseAnyFile } from '@/lib/parseDataset';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -150,6 +151,8 @@ export default function MLStudio() {
   const [expandConfig, setExpandConfig] = useState(false);
   const [selectedModel, setSelectedModel] = useState('all');
   const [customName, setCustomName] = useState('');
+  const [localOk, setLocalOk] = useState(null); // null=unknown, true/false
+  const reloadRef = useRef();
   const queryClient = useQueryClient();
   void Wrench;
 
@@ -166,6 +169,29 @@ export default function MLStudio() {
 
   const projectsWithData = projects.filter(p => p.dataset_file_url);
   const project = projectsWithData.find(p => p.id === selectedProjectId);
+
+  // Check whether the full dataset is available locally (IndexedDB) for real training.
+  useEffect(() => {
+    let alive = true;
+    if (!selectedProjectId) { setLocalOk(null); return; }
+    hasDataset(selectedProjectId).then((ok) => { if (alive) setLocalOk(ok); }).catch(() => { if (alive) setLocalOk(false); });
+    return () => { alive = false; };
+  }, [selectedProjectId]);
+
+  // Re-load the dataset file for this project (e.g., on another device / cleared cache).
+  const reloadDataset = async (e) => {
+    const f = e.target.files?.[0];
+    if (!f || !selectedProjectId) return;
+    try {
+      const parsed = await parseAnyFile(f);
+      if (!parsed?.rows?.length) return toast.error('Arquivo sem dados legíveis.');
+      await saveDataset(selectedProjectId, parsed.rows, parsed.columns || [], { filename: f.name, size: parsed.row_count });
+      setLocalOk(true);
+      toast.success(`Dataset recarregado: ${parsed.rows.length.toLocaleString('pt-BR')} linhas prontas para treino real.`);
+    } catch (err) {
+      toast.error(`Falha ao ler o arquivo: ${err.message}`);
+    } finally { if (reloadRef.current) reloadRef.current.value = ''; }
+  };
   const taskDef = TASK_TYPES.find(t => t.value === taskType);
 
   const runAnalysis = async () => {
@@ -193,12 +219,12 @@ export default function MLStudio() {
       });
       setCustomName('');
 
-      // Load stored rows for real training (silently fall back if unavailable).
+      // Load the FULL dataset from the local store (IndexedDB) for real training.
       let rows = [];
       try {
-        const r = await datarowsApi.getAll(selectedProjectId, 20000);
-        rows = (r && r.rows) || [];
-      } catch (e) { console.warn('[ML] dataset_rows indisponível:', e.message); rows = []; }
+        const d = await getDataset(selectedProjectId);
+        rows = (d && d.rows) || [];
+      } catch (e) { console.warn('[ML] dataset local indisponível:', e.message); rows = []; }
 
       const testRatio = (() => { const m = /\/(\d+)/.exec(splitRatio || ''); return m ? Math.min(0.5, Math.max(0.1, parseInt(m[1]) / 100)) : 0.2; })();
       const canReal = rows.length >= 20 && ['classification', 'regression', 'clustering'].includes(taskType);
@@ -319,6 +345,20 @@ export default function MLStudio() {
           )}
         </div>
       </GlowCard>
+
+      {/* Local dataset missing — WEKA-style reload */}
+      {selectedProjectId && localOk === false && (
+        <div className="mb-4 rounded-xl border border-amber-400/40 bg-amber-400/5 p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-amber-400">Dataset não está neste dispositivo</p>
+            <p className="text-xs text-muted-foreground">O dataset fica salvo localmente (no navegador). Recarregue o arquivo para treinar de verdade sobre todos os dados. Sem ele, a análise sai em modo estimativa.</p>
+          </div>
+          <input ref={reloadRef} type="file" accept=".csv,.tsv,.txt,.xlsx,.xls,.xlsm,.xlsb" hidden onChange={reloadDataset} />
+          <Button onClick={() => reloadRef.current?.click()} size="sm" className="bg-amber-400 text-black hover:bg-amber-300">
+            Recarregar dataset
+          </Button>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex gap-1 mb-6 bg-secondary/30 p-1 rounded-lg w-fit">

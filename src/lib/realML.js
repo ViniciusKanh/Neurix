@@ -89,7 +89,94 @@ export function buildDataset(rows, targetColumn, columnInfo, task) {
   }
   const Xs = X.map((r) => r.map((v, j) => (v - means[j]) / stds[j]));
 
-  return { X: Xs, Xraw: X, y, featureNames, classes, means, stds, targetInfo };
+  return { X: Xs, Xraw: X, y, featureNames, classes, means, stds, targetInfo, encoders, featCols };
+}
+
+// Encode + standardize a single raw row using the dataset's fitted stats.
+function encodeRow(rawRow, meta) {
+  const { featCols, encoders, means, stds } = meta;
+  const xr = [];
+  for (const c of featCols) {
+    if (isNumericType(c.type)) { const num = parseFloat(rawRow[c.name]); xr.push(isNaN(num) ? 0 : num); }
+    else { const v = String(rawRow[c.name] ?? ''); (encoders[c.name] || []).forEach((cat) => xr.push(v === cat ? 1 : 0)); }
+  }
+  return xr.map((v, j) => (v - means[j]) / (stds[j] || 1));
+}
+
+// ---------- fit-only models (return a predictor over a standardized vector) ----------
+function fitSoftmax(X, y, K, epochs = 250, lr = 0.3) {
+  const n = X.length, d = X[0].length;
+  const W = Array.from({ length: K }, () => Array(d + 1).fill(0));
+  const feat = (x) => [1, ...x];
+  for (let ep = 0; ep < epochs; ep++) {
+    const grad = Array.from({ length: K }, () => Array(d + 1).fill(0));
+    for (let i = 0; i < n; i++) {
+      const xf = feat(X[i]);
+      const scores = W.map((w) => w.reduce((s, wj, j) => s + wj * xf[j], 0));
+      const mx = Math.max(...scores);
+      const exps = scores.map((s) => Math.exp(s - mx));
+      const sum = exps.reduce((a, b) => a + b, 0);
+      for (let k = 0; k < K; k++) { const p = exps[k] / sum - (y[i] === k ? 1 : 0); for (let j = 0; j <= d; j++) grad[k][j] += p * xf[j]; }
+    }
+    for (let k = 0; k < K; k++) for (let j = 0; j <= d; j++) W[k][j] -= (lr / n) * grad[k][j];
+  }
+  return { predict(xs) { const xf = [1, ...xs]; const sc = W.map((w) => w.reduce((s, wj, j) => s + wj * xf[j], 0)); let b = 0; for (let k = 1; k < K; k++) if (sc[k] > sc[b]) b = k; return b; } };
+}
+function fitLinear(X, y, epochs = 400, lr = 0.1) {
+  const d = X[0].length, n = X.length, w = Array(d + 1).fill(0), feat = (x) => [1, ...x];
+  for (let ep = 0; ep < epochs; ep++) { const g = Array(d + 1).fill(0); for (let i = 0; i < n; i++) { const xf = feat(X[i]); const pred = w.reduce((s, wj, j) => s + wj * xf[j], 0); const err = pred - y[i]; for (let j = 0; j <= d; j++) g[j] += err * xf[j]; } for (let j = 0; j <= d; j++) w[j] -= (lr / n) * g[j]; }
+  return { predict(xs) { const xf = [1, ...xs]; return w.reduce((s, wj, j) => s + wj * xf[j], 0); } };
+}
+function fitTreeModel(X, y, task) { const imp = {}; const tree = buildTree(X, y, task, 0, 10, 8, imp); return { predict(xs) { return predictTree(tree, xs); } }; }
+function fitKNNModel(X, y, task, k = 5) { return { predict(xs) { const dd = X.map((t, i) => { let s = 0; for (let j = 0; j < xs.length; j++) s += (xs[j] - t[j]) ** 2; return [s, y[i]]; }); dd.sort((a, b) => a[0] - b[0]); const top = dd.slice(0, k); if (task === 'regression') return mean(top.map((t) => t[1])); const votes = {}; top.forEach((t) => votes[t[1]] = (votes[t[1]] || 0) + 1); return Number(Object.entries(votes).sort((a, b) => b[1] - a[1])[0][0]); } }; }
+function fitNBModel(X, y, K) {
+  const d = X[0].length;
+  const st = Array.from({ length: K }, () => ({ prior: 0, mean: Array(d).fill(0), var: Array(d).fill(1), n: 0 }));
+  X.forEach((x, i) => { const k = y[i]; st[k].n++; x.forEach((v, j) => st[k].mean[j] += v); });
+  st.forEach((s) => { if (s.n) s.mean = s.mean.map((m) => m / s.n); s.prior = s.n / X.length; });
+  X.forEach((x, i) => { const k = y[i]; x.forEach((v, j) => st[k].var[j] += (v - st[k].mean[j]) ** 2); });
+  st.forEach((s) => { s.var = s.var.map((v) => (s.n ? v / s.n : 1) + 1e-6); });
+  return { predict(xs) { let best = 0, bl = -Infinity; for (let k = 0; k < K; k++) { const s = st[k]; if (!s.n) continue; let lp = Math.log(s.prior); for (let j = 0; j < xs.length; j++) lp += -0.5 * Math.log(2 * Math.PI * s.var[j]) - ((xs[j] - s.mean[j]) ** 2) / (2 * s.var[j]); if (lp > bl) { bl = lp; best = k; } } return best; } };
+}
+
+function normalizeModelName(name, task) {
+  const s = String(name || '').toLowerCase();
+  if (s.includes('árvore') || s.includes('arvore') || s.includes('tree') || s === 'decision_tree') return 'tree';
+  if (s.includes('knn') || s.includes('nearest')) return 'knn';
+  if (s.includes('naive') || s === 'naive_bayes') return 'nb';
+  if (s.includes('linear') || s === 'linear_regression') return 'linear';
+  if (s.includes('logíst') || s.includes('logist') || s === 'logistic_regression') return 'logistic';
+  return task === 'regression' ? 'linear' : 'logistic';
+}
+
+// Trains a reusable predictor on the FULL data — used by Deploy/Inference.
+export function trainPredictor(rows, targetColumn, columnInfo, task, modelName = 'auto') {
+  const ds = buildDataset(rows, targetColumn, columnInfo, task);
+  if (ds.X.length < 10) return null;
+  const K = ds.classes ? ds.classes.length : 0;
+  if (task === 'classification' && K < 2) return null;
+  const pick = normalizeModelName(modelName, task);
+  let model;
+  if (task === 'classification') {
+    model = pick === 'tree' ? fitTreeModel(ds.X, ds.y, 'classification')
+      : pick === 'knn' ? fitKNNModel(ds.X, ds.y, 'classification')
+      : pick === 'nb' ? fitNBModel(ds.X, ds.y, K)
+      : fitSoftmax(ds.X, ds.y, K);
+  } else {
+    model = pick === 'tree' ? fitTreeModel(ds.X, ds.y, 'regression')
+      : pick === 'knn' ? fitKNNModel(ds.X, ds.y, 'regression')
+      : fitLinear(ds.X, ds.y);
+  }
+  const meta = { featCols: ds.featCols, encoders: ds.encoders, means: ds.means, stds: ds.stds };
+  return {
+    task, model_name: pick, classes: ds.classes, feature_columns: ds.featCols.map((c) => c.name),
+    predict(rawRow) {
+      const xs = encodeRow(rawRow, meta);
+      const out = model.predict(xs);
+      if (task === 'classification') return { value: ds.classes[out] ?? String(out), index: out };
+      return { value: Number(out.toFixed(4)) };
+    },
+  };
 }
 
 function split(X, y, ratio, rand) {
