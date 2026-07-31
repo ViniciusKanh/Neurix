@@ -68,7 +68,7 @@ const entities = new Proxy({}, { get: (_t, name) => makeEntity(String(name)) });
 const auth = {
   me: () => api('/auth/me'),
   config: () => api('/auth/config'),
-  login: (email, password) => api('/auth/login', { method: 'POST', body: { email, password } }),
+  login: (email, password, remember) => api('/auth/login', { method: 'POST', body: { email, password, remember } }),
   verify2FA: (challenge, code) => api('/auth/verify-2fa', { method: 'POST', body: { challenge, code } }),
   register: (data) => api('/auth/register', { method: 'POST', body: data }),
   verifyEmail: (token) => api('/auth/verify-email', { method: 'POST', body: { token } }),

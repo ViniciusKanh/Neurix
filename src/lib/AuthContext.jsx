@@ -44,8 +44,8 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => { checkUserAuth(); }, [checkUserAuth]);
 
   // Step 1 of login — returns { requires_2fa, challenge } or sets the session.
-  const login = useCallback(async (email, password) => {
-    const res = await base44.auth.login(email, password);
+  const login = useCallback(async (email, password, remember = true) => {
+    const res = await base44.auth.login(email, password, remember);
     if (res.requires_2fa) return res;
     setSession(res.token, res.user);
     return res;

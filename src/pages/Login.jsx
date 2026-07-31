@@ -17,6 +17,7 @@ export default function Login() {
   const [password2, setPassword2] = useState('');
   const [code, setCode] = useState('');
   const [challenge, setChallenge] = useState(null);
+  const [remember, setRemember] = useState(true);
   const [resetToken, setResetToken] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -47,7 +48,7 @@ export default function Login() {
   const submitCredentials = async (e) => {
     e.preventDefault(); setError(''); setLoading(true);
     try {
-      const res = await login(email.trim(), password);
+      const res = await login(email.trim(), password, remember);
       if (res.requires_2fa) { setChallenge(res.challenge); setPhase('2fa'); }
     } catch (err) { setError(err.message || 'Falha no login'); } finally { setLoading(false); }
   };
@@ -129,6 +130,10 @@ export default function Login() {
             <form onSubmit={submitCredentials} className="space-y-4">
               <Field icon={Mail} label="E-mail"><input type="email" autoFocus required value={email} onChange={(e) => setEmail(e.target.value)} className="login-input" placeholder="voce@exemplo.com" /></Field>
               <Field icon={Lock} label="Senha"><input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} className="login-input" placeholder="••••••••" /></Field>
+              <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
+                <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="accent-primary w-3.5 h-3.5" />
+                Manter-me conectado por 30 dias
+              </label>
               {error && <ErrorMsg>{error}</ErrorMsg>}
               <SubmitBtn loading={loading}>Entrar <ArrowRight className="w-4 h-4" /></SubmitBtn>
               <div className="flex items-center justify-between text-xs pt-1">

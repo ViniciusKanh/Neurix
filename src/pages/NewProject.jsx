@@ -68,7 +68,7 @@ export default function NewProject() {
         projectData.column_info = parsed.columns || [];
         projectData.dataset_size = parsed.row_count;
         projectData.dataset_columns = (parsed.columns || []).length;
-        projectData.data_sample = (parsed.data_sample || []).slice(0, 20);
+        projectData.data_sample = (parsed.data_sample || []).slice(0, 300);
         projectData.status = 'exploring';
 
         // Local diagnosis — no external API

@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils';
 
 const TOOLTIP_STYLE = { background: 'hsl(222, 40%, 9%)', border: '1px solid hsl(222, 25%, 16%)', borderRadius: '8px', color: '#fff', fontSize: '11px' };
 const COLORS = ['hsl(187,92%,55%)', 'hsl(265,70%,60%)', 'hsl(152,68%,50%)', 'hsl(35,92%,60%)', 'hsl(0,72%,55%)'];
-const TABS = [{ id: 'series', label: 'Série Temporal' }, { id: 'decomp', label: 'Decomposição STL' }, { id: 'anomalies', label: 'Anomalias' }, { id: 'forecast', label: 'Previsão' }, { id: 'ai', label: 'Análise IA' }];
+const TABS = [{ id: 'series', label: 'Série Temporal' }, { id: 'decomp', label: 'Decomposição STL' }, { id: 'anomalies', label: 'Anomalias' }, { id: 'forecast', label: 'Previsão' }, { id: 'ai', label: 'Análise' }];
 
 const FORECAST_MODELS = [
   { id: 'moving_avg', label: 'Média Móvel', description: 'Suaviza tendências de curto prazo' },
@@ -48,76 +48,20 @@ export default function TimeSeries() {
     if (!targetColumn) return toast.error('Selecione a coluna alvo (variável temporal)');
     setIsAnalyzing(true);
     setResult(null);
+    await new Promise(r => setTimeout(r, 400));
 
-    const res = await base44.integrations.Core.InvokeLLM({
-      prompt: `Você é especialista em análise de séries temporais. Analise o dataset e simule uma análise completa de série temporal.
-
-DATASET: ${project.dataset_filename} (${project.dataset_size} linhas)
-COLUNA ALVO (variável temporal): ${targetColumn}
-COLUNA DE DATA: ${dateColumn || 'Índice sequencial (sem coluna de data explícita)'}
-COLUNAS DISPONÍVEIS: ${JSON.stringify(columns.slice(0, 20))}
-AMOSTRA: ${JSON.stringify((project.data_sample || []).slice(0, 10))}
-
-Parâmetros:
-- Horizonte de previsão: ${forecastHorizon} períodos
-- Modelo de previsão: ${forecastModel}
-- Janela para detecção de anomalias: ${windowSize} períodos
-
-Simule e retorne JSON com:
-{
-  "series_data": [{"period": string, "value": number, "moving_avg": number}] (50-80 pontos temporais realistas),
-  "trend": "ascending" | "descending" | "stable" | "cyclical",
-  "trend_magnitude": number,
-  "seasonality": {
-    "detected": boolean,
-    "period": number,
-    "type": "weekly"|"monthly"|"quarterly"|"annual"|"none",
-    "strength": number (0-1),
-    "description": string
-  },
-  "stl_decomposition": {
-    "trend_component": [{"period": string, "value": number}],
-    "seasonal_component": [{"period": string, "value": number}],
-    "residual_component": [{"period": string, "value": number}]
-  },
-  "anomalies": [{"period": string, "value": number, "expected": number, "z_score": number, "severity": "high"|"medium"|"low", "description": string}],
-  "anomaly_threshold": number,
-  "forecast": {
-    "model": string,
-    "horizon": number,
-    "predictions": [{"period": string, "value": number, "lower_bound": number, "upper_bound": number, "confidence": number}],
-    "mae": number,
-    "rmse": number,
-    "mape": number,
-    "model_description": string
-  },
-  "statistics": {
-    "mean": number, "std": number, "min": number, "max": number,
-    "autocorrelation": number, "stationarity": boolean, "stationarity_test": string
-  },
-  "insights": [string],
-  "ai_analysis": string (markdown detalhado em português: tendência, sazonalidade, anomalias encontradas, qualidade da previsão e recomendações)
-}`,
-      response_json_schema: {
-        type: "object",
-        properties: {
-          series_data: { type: "array", items: { type: "object" } },
-          trend: { type: "string" },
-          trend_magnitude: { type: "number" },
-          seasonality: { type: "object" },
-          stl_decomposition: { type: "object" },
-          anomalies: { type: "array", items: { type: "object" } },
-          anomaly_threshold: { type: "number" },
-          forecast: { type: "object" },
-          statistics: { type: "object" },
-          insights: { type: "array", items: { type: "string" } },
-          ai_analysis: { type: "string" },
-        }
-      }
+    const { runTimeSeries } = await import('@/lib/localTimeSeries');
+    const res = runTimeSeries(project, {
+      targetColumn,
+      dateColumn: dateColumn || null,
+      horizon: forecastHorizon,
+      model: forecastModel,
+      window: windowSize,
     });
 
-    setResult(res);
     setIsAnalyzing(false);
+    if (res.error) { toast.error(res.message); return; }
+    setResult(res);
     setActiveTab('series');
     toast.success('Análise de série temporal concluída!');
   };

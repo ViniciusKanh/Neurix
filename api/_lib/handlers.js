@@ -68,11 +68,13 @@ export async function authHandler(req, res, ctx) {
       return bad(res, 403, 'Confirme seu e-mail antes de entrar. Verifique sua caixa de entrada.');
     }
 
+    const remember = !!body.remember;
+    const expiresIn = remember ? '30d' : '1d';
     if (row.totp_enabled) {
-      const challenge = signToken({ sub: row.id, purpose: '2fa' }, '10m');
+      const challenge = signToken({ sub: row.id, purpose: '2fa', remember }, '10m');
       return json(res, 200, { requires_2fa: true, challenge });
     }
-    const token = signToken({ sub: row.id });
+    const token = signToken({ sub: row.id }, expiresIn);
     return json(res, 200, { token, user: serializeUser(row) });
   }
 
@@ -84,7 +86,7 @@ export async function authHandler(req, res, ctx) {
     const row = await queryOne('SELECT * FROM users WHERE id = ?', [payload.sub]);
     if (!row) return bad(res, 401, 'Usuário não encontrado');
     if (!verifyTotp(row.totp_secret, body.code)) return bad(res, 401, 'Código 2FA inválido');
-    const token = signToken({ sub: row.id });
+    const token = signToken({ sub: row.id }, payload.remember ? '30d' : '1d');
     return json(res, 200, { token, user: serializeUser(row) });
   }
 

@@ -98,7 +98,7 @@ export function parseCSVFile(file) {
         resolve({
           columns: inferAndBuildColumns(headers, dataRows),
           row_count: lines.length - 1,
-          data_sample: dataRows.slice(0, 20),
+          data_sample: dataRows.slice(0, 300),
         });
       } catch (err) {
         reject(err);
@@ -132,7 +132,7 @@ export async function parseExcelFile(file) {
   return {
     columns: inferAndBuildColumns(headers, dataRows),
     row_count: rows.length - 1,
-    data_sample: dataRows.slice(0, 20),
+    data_sample: dataRows.slice(0, 300),
     sheet_name: sheetName,
     sheet_count: wb.SheetNames.length,
   };
