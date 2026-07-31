@@ -1,9 +1,9 @@
 <div align="center">
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="src/assets/logo-white-name.png">
-  <source media="(prefers-color-scheme: light)" srcset="src/assets/logo-black-name.png">
-  <img src="src/assets/logo-white-name.png" alt="Neurix" width="420">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/wordmark-white.png">
+  <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/wordmark-dark.png">
+  <img src="docs/screenshots/wordmark-white.png" alt="Neurix" width="380">
 </picture>
 
 ### 🧠 Workbench de Machine Learning • 100% Local • Sem IA generativa
