@@ -41,7 +41,7 @@ export default function ModelingPipeline({ project, analyses = [] }) {
   const techniques = [...new Set(completed.map((a) => TYPE_LABEL[a.type] || a.type))];
 
   const stages = [
-    { icon: Database, label: 'Dataset', detail: `${project.dataset_size?.toLocaleString('pt-BR') || 0} linhas · ${project.dataset_columns || 0} colunas`, done: !!project.dataset_file_url },
+    { icon: Database, label: 'Dataset', detail: `${project.dataset_size?.toLocaleString('pt-BR') || 0} linhas · ${project.rows_stored ? `${project.rows_stored.toLocaleString('pt-BR')} armazenadas p/ treino real` : 'só amostra — reenvie p/ treino real'}`, done: !!project.dataset_file_url },
     { icon: FlaskConical, label: 'Pré-processamento', detail: `${(project.prep_steps || []).length} etapa(s)`, done: (project.prep_steps || []).length > 0 },
     { icon: Brain, label: 'Feature Selection', detail: completed.some((a) => a.type === 'feature_selection') ? 'Executada' : 'Não executada', done: completed.some((a) => a.type === 'feature_selection') },
     { icon: Cpu, label: 'Modelagem', detail: `${models.length} modelo(s)`, done: models.length > 0 },

@@ -30,29 +30,20 @@ const TASK_TYPES = [
 
 const SPLIT_OPTIONS = ['70/30', '80/20', '75/25', '60/40'];
 
+// Only the models the local engine actually trains (real, no external libs).
 const MODEL_OPTIONS = {
   classification: [
     { value: 'all', label: 'Todos os modelos (recomendado)' },
     { value: 'logistic_regression', label: 'Regressão Logística' },
-    { value: 'random_forest', label: 'Random Forest' },
-    { value: 'xgboost', label: 'XGBoost' },
-    { value: 'svm', label: 'SVM' },
-    { value: 'gradient_boosting', label: 'Gradient Boosting' },
     { value: 'decision_tree', label: 'Árvore de Decisão' },
     { value: 'knn', label: 'K-Nearest Neighbors' },
     { value: 'naive_bayes', label: 'Naive Bayes' },
-    { value: 'neural_network', label: 'Rede Neural (MLP)' },
   ],
   regression: [
     { value: 'all', label: 'Todos os modelos (recomendado)' },
     { value: 'linear_regression', label: 'Regressão Linear' },
-    { value: 'ridge', label: 'Ridge' },
-    { value: 'lasso', label: 'Lasso' },
-    { value: 'elasticnet', label: 'ElasticNet' },
-    { value: 'random_forest', label: 'Random Forest' },
-    { value: 'xgboost', label: 'XGBoost' },
-    { value: 'svr', label: 'SVR' },
-    { value: 'gradient_boosting', label: 'Gradient Boosting' },
+    { value: 'decision_tree', label: 'Árvore de Decisão' },
+    { value: 'knn', label: 'K-Nearest Neighbors' },
   ],
 };
 const CV_OPTIONS = ['Sem CV', 'K-Fold (5)', 'K-Fold (10)', 'StratifiedKFold (5)', 'Leave-One-Out'];
@@ -230,6 +221,21 @@ export default function MLStudio() {
       }
 
       result.training_mode = realUsed ? 'real' : 'estimado';
+
+      // When a specific model is chosen, focus the result on it (works for both
+      // real training and the estimator) so it differs from "Todos os modelos".
+      if (selectedModel && selectedModel !== 'all' && Array.isArray(result.models_comparison)) {
+        const nameMap = { logistic_regression: 'Regressão Logística', decision_tree: 'Árvore de Decisão', knn: 'KNN', naive_bayes: 'Naive Bayes', linear_regression: 'Regressão Linear' };
+        const wanted = nameMap[selectedModel];
+        const found = wanted && result.models_comparison.find((m) => m.name === wanted || (m.name || '').toLowerCase().includes(wanted.toLowerCase()));
+        if (found) {
+          result.models_comparison = [found];
+          result.metrics = found.metrics;
+          result.best_model = found.name;
+          if (found.confusion_matrix) result.confusion_matrix = found.confusion_matrix;
+          result.interpretation = `**Modelo específico: ${found.name}**\n\n` + (result.interpretation || '');
+        }
+      }
 
       await base44.entities.Analysis.update(analysis.id, {
         status: 'completed', results: result,
