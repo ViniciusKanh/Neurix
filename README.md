@@ -273,51 +273,6 @@ Em **Configurações → Aparência**, escolha entre **7 paletas** (Neural Cyan,
 
 ---
 
-## ☁️ Deploy na Vercel
-
-```bash
-npm i -g vercel
-vercel login
-vercel        # linka o projeto (1ª vez)
-vercel --prod # publica em produção
-```
-
-No painel da Vercel → **Settings → Environment Variables**, cadastre as mesmas chaves do `.env`
-(`TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, `JWT_SECRET`, `TOTP_ISSUER`, `VITE_PUBLIC_TURSO_URL`) e faça o redeploy.
-
-> O front (Vite) e as funções em `/api` são servidos juntos pela Vercel — mesmo comportamento do ambiente local.
-
----
-
-## ⬆️ Subir no GitHub
-
-O `.gitignore` já protege o `.env` (suas credenciais **não** vão para o Git).
-
-```bash
-cd C:\dev\Neurix
-git init
-git add .
-git commit -m "🚀 Neurix — ML Workbench local (Turso + Vercel)"
-git branch -M main
-git remote add origin https://github.com/ViniciusKanh/Neurix.git
-git push -u origin main
-```
-
-> Se o repositório já tiver commits e o push for rejeitado, use:
-> ```bash
-> git pull origin main --allow-unrelated-histories
-> # resolva conflitos, se houver, e então:
-> git push -u origin main
-> ```
-
-Para os próximos envios:
-```bash
-git add .
-git commit -m "descrição da mudança"
-git push
-```
----
-
 ## 🗂️ Estrutura do projeto
 
 ```
