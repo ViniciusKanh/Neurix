@@ -125,12 +125,13 @@ export default function NewProject() {
           stored += chunk.length;
           setProgress(Math.round((stored / allRows.length) * 100));
         } catch (err) {
+          console.error('[NewProject] falha ao salvar linhas em dataset_rows:', err, err.data);
           const code = err.data?.code;
           if (code === 'DB_LIMIT' || code === 'ROW_LIMIT') {
             limitHit = true;
             toast.error(`Banco atingiu o limite — o projeto ficou com ${stored.toLocaleString('pt-BR')} de ${allRows.length.toLocaleString('pt-BR')} linhas. As análises usarão o que coube.`);
           } else {
-            toast.error(`Falha ao salvar linhas: ${err.message}. Projeto criado com ${stored.toLocaleString('pt-BR')} linhas.`);
+            toast.error(`Não foi possível armazenar as linhas (${err.message}). Rode "npm run db:migrate" e reinicie o servidor. Projeto criado com ${stored.toLocaleString('pt-BR')} linhas.`);
           }
           break;
         }

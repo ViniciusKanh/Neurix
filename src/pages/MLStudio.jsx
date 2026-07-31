@@ -185,45 +185,57 @@ export default function MLStudio() {
       ? ` · ${selectedModel}` : '';
     const analysisName = customName.trim() || `${label}${modelPart}`;
 
-    const analysis = await base44.entities.Analysis.create({
-      project_id: selectedProjectId, type: taskType, name: analysisName, status: 'running',
-      config: { target_column: targetColumn, split: splitRatio, cv: cvStrategy, balancing, selected_model: selectedModel },
-    });
-    setCustomName('');
-
+    let analysis;
     try {
-      // Try REAL training on the full stored rows; fall back to the estimator.
+      analysis = await base44.entities.Analysis.create({
+        project_id: selectedProjectId, type: taskType, name: analysisName, status: 'running',
+        config: { target_column: targetColumn, split: splitRatio, cv: cvStrategy, balancing, selected_model: selectedModel },
+      });
+      setCustomName('');
+
+      // Load stored rows for real training (silently fall back if unavailable).
       let rows = [];
       try {
         const r = await datarowsApi.getAll(selectedProjectId, 20000);
-        rows = r.rows || [];
-      } catch { rows = []; }
+        rows = (r && r.rows) || [];
+      } catch (e) { console.warn('[ML] dataset_rows indisponível:', e.message); rows = []; }
 
       const testRatio = (() => { const m = /\/(\d+)/.exec(splitRatio || ''); return m ? Math.min(0.5, Math.max(0.1, parseInt(m[1]) / 100)) : 0.2; })();
       const canReal = rows.length >= 20 && ['classification', 'regression', 'clustering'].includes(taskType);
+      const cols = project?.column_info || [];
 
-      let result; let realUsed = false;
-      if (canReal && taskType === 'classification') { result = runRealClassification(rows, targetColumn, project.column_info, testRatio, selectedModel); realUsed = !result.error; }
-      else if (canReal && taskType === 'regression') { result = runRealRegression(rows, targetColumn, project.column_info, testRatio, selectedModel); realUsed = !result.error; }
-      else if (canReal && taskType === 'clustering') { result = runRealClustering(rows, project.column_info, 3); realUsed = !result.error; }
-
-      // Fallback (no rows stored, or real engine returned an error/edge case)
-      if (!result || result.error) {
-        realUsed = false;
-        await new Promise(r => setTimeout(r, 600));
-        if (taskType === 'classification') result = runClassification(project, targetColumn, splitRatio, cvStrategy, balancing);
-        else if (taskType === 'regression') result = runRegression(project, targetColumn, splitRatio, cvStrategy);
-        else if (taskType === 'clustering') result = runClustering(project);
-        else if (taskType === 'anomaly_detection') result = runAnomalyDetection(project);
-        else if (taskType === 'dimensionality_reduction') result = runDimReduction(project);
-        else if (taskType === 'feature_selection') result = runFeatureSelection(project, targetColumn);
-        else result = { interpretation: 'Análise concluída.', recommendations: [] };
+      let result = null; let realUsed = false;
+      if (canReal) {
+        try {
+          if (taskType === 'classification') result = runRealClassification(rows, targetColumn, cols, testRatio, selectedModel);
+          else if (taskType === 'regression') result = runRealRegression(rows, targetColumn, cols, testRatio, selectedModel);
+          else if (taskType === 'clustering') result = runRealClustering(rows, cols, 3);
+          realUsed = !!result && !result.error;
+        } catch (e) { console.error('[ML] treino real falhou, usando estimativa:', e); result = null; }
       }
 
+      // Fallback estimator (no rows, or real engine failed/edge case)
+      if (!result || result.error) {
+        realUsed = false;
+        await new Promise(r => setTimeout(r, 400));
+        try {
+          if (taskType === 'classification') result = runClassification(project, targetColumn, splitRatio, cvStrategy, balancing);
+          else if (taskType === 'regression') result = runRegression(project, targetColumn, splitRatio, cvStrategy);
+          else if (taskType === 'clustering') result = runClustering(project);
+          else if (taskType === 'anomaly_detection') result = runAnomalyDetection(project);
+          else if (taskType === 'dimensionality_reduction') result = runDimReduction(project);
+          else if (taskType === 'feature_selection') result = runFeatureSelection(project, targetColumn);
+          else result = { interpretation: 'Análise concluída.', recommendations: [] };
+        } catch (e) {
+          console.error('[ML] estimativa falhou:', e);
+          result = { interpretation: `Não foi possível gerar a análise: ${e.message}. Verifique a coluna-alvo e o dataset.`, recommendations: [], metrics: {} };
+        }
+      }
+
+      if (!result || typeof result !== 'object') result = { interpretation: 'Análise concluída.', recommendations: [], metrics: {} };
       result.training_mode = realUsed ? 'real' : 'estimado';
 
-      // When a specific model is chosen, focus the result on it (works for both
-      // real training and the estimator) so it differs from "Todos os modelos".
+      // Focus on a specific model when chosen (differs from "Todos os modelos").
       if (selectedModel && selectedModel !== 'all' && Array.isArray(result.models_comparison)) {
         const nameMap = { logistic_regression: 'Regressão Logística', decision_tree: 'Árvore de Decisão', knn: 'KNN', naive_bayes: 'Naive Bayes', linear_regression: 'Regressão Linear' };
         const wanted = nameMap[selectedModel];
@@ -239,14 +251,24 @@ export default function MLStudio() {
 
       await base44.entities.Analysis.update(analysis.id, {
         status: 'completed', results: result,
-        ai_interpretation: result?.interpretation || '',
-        ai_recommendations: result?.recommendations || [],
+        ai_interpretation: result.interpretation || '',
+        ai_recommendations: result.recommendations || [],
       });
 
       queryClient.invalidateQueries({ queryKey: ['analyses', selectedProjectId] });
       toast.success(realUsed ? `Treino real concluído sobre ${(result.trained_on || rows.length).toLocaleString('pt-BR')} linhas!` : 'Análise concluída (estimativa — projeto sem linhas armazenadas).');
     } catch (err) {
-      try { await base44.entities.Analysis.update(analysis.id, { status: 'failed', ai_interpretation: `Falha: ${err.message}` }); } catch { /* ignore */ }
+      console.error('[ML] runAnalysis erro:', err);
+      // Always leave the analysis in a renderable state.
+      if (analysis) {
+        try {
+          await base44.entities.Analysis.update(analysis.id, {
+            status: 'completed',
+            results: { interpretation: `Falha ao gerar a análise: ${err.message}`, recommendations: [], metrics: {} },
+            ai_interpretation: `Falha ao gerar a análise: ${err.message}`,
+          });
+        } catch { /* ignore */ }
+      }
       queryClient.invalidateQueries({ queryKey: ['analyses', selectedProjectId] });
       toast.error(`Falha ao treinar: ${err.message}`);
     } finally {
