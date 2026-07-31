@@ -288,9 +288,12 @@ export async function entitiesHandler(req, res, ctx) {
   const second = segments[1];
   if (!type) return bad(res, 400, 'Tipo de entidade ausente');
 
+  // Data is isolated per user: everyone only sees the records they own.
+  const owner = me.id;
+
   // POST /api/entities/:type/filter  { query, sort, limit }
   if (second === 'filter' && method === 'POST') {
-    const rows = await queryAll('SELECT * FROM records WHERE entity_type = ?', [type]);
+    const rows = await queryAll('SELECT * FROM records WHERE entity_type = ? AND created_by_id = ?', [type, owner]);
     let list = rows.map(rowToEntity).filter((e) => matchesQuery(e, body.query || {}));
     list = applySortLimit(list, body.sort, body.limit);
     return json(res, 200, list);
@@ -299,7 +302,7 @@ export async function entitiesHandler(req, res, ctx) {
   // Collection routes  /api/entities/:type
   if (!second) {
     if (method === 'GET') {
-      const rows = await queryAll('SELECT * FROM records WHERE entity_type = ?', [type]);
+      const rows = await queryAll('SELECT * FROM records WHERE entity_type = ? AND created_by_id = ?', [type, owner]);
       let list = rows.map(rowToEntity);
       list = applySortLimit(list, query.sort, query.limit);
       return json(res, 200, list);
@@ -321,10 +324,10 @@ export async function entitiesHandler(req, res, ctx) {
     }
   }
 
-  // Item routes  /api/entities/:type/:id
+  // Item routes  /api/entities/:type/:id  (only own records)
   if (second) {
     const id = second;
-    const existing = await queryOne('SELECT * FROM records WHERE id = ? AND entity_type = ?', [id, type]);
+    const existing = await queryOne('SELECT * FROM records WHERE id = ? AND entity_type = ? AND created_by_id = ?', [id, type, owner]);
     if (method === 'GET') {
       if (!existing) return bad(res, 404, 'Registro não encontrado');
       return json(res, 200, rowToEntity(existing));
@@ -335,12 +338,13 @@ export async function entitiesHandler(req, res, ctx) {
       const { id: _i, created_date, updated_date, created_by_id, ...currentData } = current;
       const merged = { ...currentData, ...body };
       const ts = nowISO();
-      await run('UPDATE records SET data = ?, updated_date = ? WHERE id = ?',
-        [JSON.stringify(merged), ts, id]);
+      await run('UPDATE records SET data = ?, updated_date = ? WHERE id = ? AND created_by_id = ?',
+        [JSON.stringify(merged), ts, id, owner]);
       return json(res, 200, { id, created_date, updated_date: ts, created_by_id, ...merged });
     }
     if (method === 'DELETE') {
-      await run('DELETE FROM records WHERE id = ? AND entity_type = ?', [id, type]);
+      if (!existing) return bad(res, 404, 'Registro não encontrado');
+      await run('DELETE FROM records WHERE id = ? AND entity_type = ? AND created_by_id = ?', [id, type, owner]);
       return json(res, 200, { ok: true });
     }
   }
