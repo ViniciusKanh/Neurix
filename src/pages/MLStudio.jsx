@@ -31,19 +31,26 @@ const TASK_TYPES = [
 
 const SPLIT_OPTIONS = ['70/30', '80/20', '75/25', '60/40'];
 
-// Only the models the local engine actually trains (real, no external libs).
+// All models are REAL (trained in-browser on the full dataset).
 const MODEL_OPTIONS = {
   classification: [
     { value: 'all', label: 'Todos os modelos (recomendado)' },
     { value: 'logistic_regression', label: 'Regressão Logística' },
     { value: 'decision_tree', label: 'Árvore de Decisão' },
+    { value: 'random_forest', label: 'Random Forest' },
+    { value: 'gradient_boosting', label: 'Gradient Boosting' },
+    { value: 'svm', label: 'SVM (linear)' },
     { value: 'knn', label: 'K-Nearest Neighbors' },
     { value: 'naive_bayes', label: 'Naive Bayes' },
   ],
   regression: [
     { value: 'all', label: 'Todos os modelos (recomendado)' },
     { value: 'linear_regression', label: 'Regressão Linear' },
+    { value: 'ridge', label: 'Ridge' },
+    { value: 'lasso', label: 'Lasso' },
     { value: 'decision_tree', label: 'Árvore de Decisão' },
+    { value: 'random_forest', label: 'Random Forest' },
+    { value: 'gradient_boosting', label: 'Gradient Boosting' },
     { value: 'knn', label: 'K-Nearest Neighbors' },
   ],
 };
@@ -263,7 +270,7 @@ export default function MLStudio() {
 
       // Focus on a specific model when chosen (differs from "Todos os modelos").
       if (selectedModel && selectedModel !== 'all' && Array.isArray(result.models_comparison)) {
-        const nameMap = { logistic_regression: 'Regressão Logística', decision_tree: 'Árvore de Decisão', knn: 'KNN', naive_bayes: 'Naive Bayes', linear_regression: 'Regressão Linear' };
+        const nameMap = { logistic_regression: 'Regressão Logística', decision_tree: 'Árvore de Decisão', random_forest: 'Random Forest', gradient_boosting: 'Gradient Boosting', svm: 'SVM', knn: 'KNN', naive_bayes: 'Naive Bayes', linear_regression: 'Regressão Linear', ridge: 'Ridge', lasso: 'Lasso' };
         const wanted = nameMap[selectedModel];
         const found = wanted && result.models_comparison.find((m) => m.name === wanted || (m.name || '').toLowerCase().includes(wanted.toLowerCase()));
         if (found) {

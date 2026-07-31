@@ -26,7 +26,15 @@ function shuffleIdx(n, rand) {
 export function buildDataset(rows, targetColumn, columnInfo, task) {
   const cols = columnInfo || [];
   const hasTarget = cols.some((c) => c.name === targetColumn);
-  const featCols = hasTarget ? cols.filter((c) => c.name !== targetColumn) : cols;
+  const nRows = rows.length || 1;
+  // Drop identifier-like columns (nearly unique numeric, or names ending in id).
+  const isIdLike = (c) => {
+    const nm = (c.name || '').toLowerCase();
+    const nearlyUnique = (c.unique_count || 0) >= 0.9 * nRows && (c.unique_count || 0) > 50;
+    return (isNumericType(c.type) && nearlyUnique) || /(^id$|_id$|id$|codigo|código)$/i.test(nm) && nearlyUnique;
+  };
+  let featCols = (hasTarget ? cols.filter((c) => c.name !== targetColumn) : cols).filter((c) => !isIdLike(c));
+  if (featCols.length === 0) featCols = hasTarget ? cols.filter((c) => c.name !== targetColumn) : cols;
   const targetInfo = cols.find((c) => c.name === targetColumn);
 
   // categorical encoders (one-hot, top categories)
@@ -139,8 +147,74 @@ function fitNBModel(X, y, K) {
   return { predict(xs) { let best = 0, bl = -Infinity; for (let k = 0; k < K; k++) { const s = st[k]; if (!s.n) continue; let lp = Math.log(s.prior); for (let j = 0; j < xs.length; j++) lp += -0.5 * Math.log(2 * Math.PI * s.var[j]) - ((xs[j] - s.mean[j]) ** 2) / (2 * s.var[j]); if (lp > bl) { bl = lp; best = k; } } return best; } };
 }
 
+// ---------- extra real models (RF, SVM, Ridge, Lasso, Gradient Boosting) ----------
+function fitRandomForest(X, y, task, rand, nTrees = 12) {
+  const n = X.length, trees = [];
+  for (let t = 0; t < nTrees; t++) {
+    const idx = Array.from({ length: n }, () => Math.floor(rand() * n));
+    trees.push(buildTree(idx.map((i) => X[i]), idx.map((i) => y[i]), task, 0, 9, 6, {}));
+  }
+  return { predict(xs) {
+    const preds = trees.map((tr) => predictTree(tr, xs));
+    if (task === 'regression') return mean(preds);
+    const votes = {}; preds.forEach((p) => votes[p] = (votes[p] || 0) + 1);
+    return Number(Object.entries(votes).sort((a, b) => b[1] - a[1])[0][0]);
+  } };
+}
+
+function fitSVM(X, y, K, epochs = 180, lr = 0.05, lambda = 0.001) {
+  const d = X[0].length, n = X.length, feat = (x) => [1, ...x];
+  const Ws = [];
+  for (let c = 0; c < K; c++) {
+    const w = Array(d + 1).fill(0);
+    for (let ep = 0; ep < epochs; ep++) {
+      for (let i = 0; i < n; i++) {
+        const xf = feat(X[i]); const yi = y[i] === c ? 1 : -1;
+        const margin = w.reduce((s, wj, j) => s + wj * xf[j], 0) * yi;
+        for (let j = 0; j <= d; j++) { const reg = j === 0 ? 0 : lambda * w[j]; w[j] -= lr * (reg - (margin < 1 ? yi * xf[j] : 0)); }
+      }
+    }
+    Ws.push(w);
+  }
+  return { predict(xs) { const xf = [1, ...xs]; let b = 0, bs = -Infinity; for (let c = 0; c < K; c++) { const s = Ws[c].reduce((a, wj, j) => a + wj * xf[j], 0); if (s > bs) { bs = s; b = c; } } return b; } };
+}
+
+function fitLinearPenalized(X, y, penalty, lambda, epochs = 400, lr = 0.1) {
+  const d = X[0].length, n = X.length, w = Array(d + 1).fill(0), feat = (x) => [1, ...x];
+  for (let ep = 0; ep < epochs; ep++) {
+    const g = Array(d + 1).fill(0);
+    for (let i = 0; i < n; i++) { const xf = feat(X[i]); const pred = w.reduce((s, wj, j) => s + wj * xf[j], 0); const err = pred - y[i]; for (let j = 0; j <= d; j++) g[j] += err * xf[j]; }
+    for (let j = 0; j <= d; j++) { let reg = 0; if (j > 0) reg = penalty === 'l2' ? lambda * w[j] : lambda * Math.sign(w[j]); w[j] -= (lr / n) * g[j] + (lr / n) * reg; }
+  }
+  return { predict(xs) { const xf = [1, ...xs]; return w.reduce((s, wj, j) => s + wj * xf[j], 0); } };
+}
+const fitRidge = (X, y) => fitLinearPenalized(X, y, 'l2', 0.5);
+const fitLasso = (X, y) => fitLinearPenalized(X, y, 'l1', 0.1);
+
+function fitGBReg(X, y, rounds = 25, lr = 0.2, depth = 3) {
+  const base = mean(y); const F = y.map(() => base); const trees = [];
+  for (let m = 0; m < rounds; m++) { const resid = y.map((v, i) => v - F[i]); const tr = buildTree(X, resid, 'regression', 0, depth, 8, {}); trees.push(tr); for (let i = 0; i < X.length; i++) F[i] += lr * predictTree(tr, X[i]); }
+  return { predict(xs) { let s = base; for (const tr of trees) s += lr * predictTree(tr, xs); return s; } };
+}
+
+function fitGBClass(X, y, K, rounds = 22, lr = 0.3, depth = 3) {
+  const sigmoid = (z) => 1 / (1 + Math.exp(-z));
+  const treesPer = [];
+  for (let c = 0; c < K; c++) {
+    const yc = y.map((v) => (v === c ? 1 : 0)); const F = X.map(() => 0); const trees = [];
+    for (let m = 0; m < rounds; m++) { const grad = yc.map((v, i) => v - sigmoid(F[i])); const tr = buildTree(X, grad, 'regression', 0, depth, 8, {}); trees.push(tr); for (let i = 0; i < X.length; i++) F[i] += lr * predictTree(tr, X[i]); }
+    treesPer.push(trees);
+  }
+  return { predict(xs) { let b = 0, bs = -Infinity; for (let c = 0; c < K; c++) { let s = 0; for (const tr of treesPer[c]) s += lr * predictTree(tr, xs); if (s > bs) { bs = s; b = c; } } return b; } };
+}
+
 function normalizeModelName(name, task) {
   const s = String(name || '').toLowerCase();
+  if (s.includes('random') || s.includes('floresta')) return 'rf';
+  if (s.includes('boosting') || s.includes('gradient') || s.includes('xgb')) return 'gb';
+  if (s.includes('svm') || s.includes('svr') || s.includes('vector')) return 'svm';
+  if (s.includes('ridge')) return 'ridge';
+  if (s.includes('lasso')) return 'lasso';
   if (s.includes('árvore') || s.includes('arvore') || s.includes('tree') || s === 'decision_tree') return 'tree';
   if (s.includes('knn') || s.includes('nearest')) return 'knn';
   if (s.includes('naive') || s === 'naive_bayes') return 'nb';
@@ -156,14 +230,22 @@ export function trainPredictor(rows, targetColumn, columnInfo, task, modelName =
   const K = ds.classes ? ds.classes.length : 0;
   if (task === 'classification' && K < 2) return null;
   const pick = normalizeModelName(modelName, task);
+  const rf = seededRand(999);
   let model;
   if (task === 'classification') {
     model = pick === 'tree' ? fitTreeModel(ds.X, ds.y, 'classification')
+      : pick === 'rf' ? fitRandomForest(ds.X, ds.y, 'classification', rf)
+      : pick === 'gb' ? fitGBClass(ds.X, ds.y, K)
+      : pick === 'svm' ? fitSVM(ds.X, ds.y, K)
       : pick === 'knn' ? fitKNNModel(ds.X, ds.y, 'classification')
       : pick === 'nb' ? fitNBModel(ds.X, ds.y, K)
       : fitSoftmax(ds.X, ds.y, K);
   } else {
     model = pick === 'tree' ? fitTreeModel(ds.X, ds.y, 'regression')
+      : pick === 'rf' ? fitRandomForest(ds.X, ds.y, 'regression', rf)
+      : pick === 'gb' ? fitGBReg(ds.X, ds.y)
+      : pick === 'ridge' ? fitRidge(ds.X, ds.y)
+      : pick === 'lasso' ? fitLasso(ds.X, ds.y)
       : pick === 'knn' ? fitKNNModel(ds.X, ds.y, 'regression')
       : fitLinear(ds.X, ds.y);
   }
@@ -369,6 +451,9 @@ export function runRealClassification(rows, targetColumn, columnInfo, splitRatio
   const candidates = {
     'Regressão Logística': () => softmaxRegression(Xtr, ytr, Xte, K),
     'Árvore de Decisão': () => decisionTree(Xtr, ytr, Xte, 'classification', importance),
+    'Random Forest': () => { const m = fitRandomForest(Xtr, ytr, 'classification', rand); return Xte.map((x) => m.predict(x)); },
+    'Gradient Boosting': () => { const m = fitGBClass(Xtr, ytr, K); return Xte.map((x) => m.predict(x)); },
+    'SVM': () => { const m = fitSVM(Xtr, ytr, K); return Xte.map((x) => m.predict(x)); },
     'KNN': () => knn(Xtr, ytr, Xte, 5, 'classification', rand),
     'Naive Bayes': () => gaussianNB(Xtr, ytr, Xte, K),
   };
@@ -421,7 +506,11 @@ export function runRealRegression(rows, targetColumn, columnInfo, splitRatio = 0
   const importance = {};
   const candidates = {
     'Regressão Linear': () => linearRegression(Xtr, ytr, Xte),
+    'Ridge': () => { const m = fitRidge(Xtr, ytr); return Xte.map((x) => m.predict(x)); },
+    'Lasso': () => { const m = fitLasso(Xtr, ytr); return Xte.map((x) => m.predict(x)); },
     'Árvore de Decisão': () => decisionTree(Xtr, ytr, Xte, 'regression', importance),
+    'Random Forest': () => { const m = fitRandomForest(Xtr, ytr, 'regression', rand); return Xte.map((x) => m.predict(x)); },
+    'Gradient Boosting': () => { const m = fitGBReg(Xtr, ytr); return Xte.map((x) => m.predict(x)); },
     'KNN': () => knn(Xtr, ytr, Xte, 5, 'regression', rand),
   };
   const chosen = selectedModel && selectedModel !== 'all' ? pickModels(candidates, selectedModel) : candidates;
@@ -514,7 +603,9 @@ function featureImportance(importance, names) {
 function pickModels(candidates, selectedModel) {
   const map = {
     logistic: 'Regressão Logística', logistic_regression: 'Regressão Logística', linear: 'Regressão Linear',
-    decision_tree: 'Árvore de Decisão', tree: 'Árvore de Decisão', knn: 'KNN', naive_bayes: 'Naive Bayes',
+    linear_regression: 'Regressão Linear', decision_tree: 'Árvore de Decisão', tree: 'Árvore de Decisão',
+    random_forest: 'Random Forest', gradient_boosting: 'Gradient Boosting', svm: 'SVM', svr: 'SVM',
+    knn: 'KNN', naive_bayes: 'Naive Bayes', ridge: 'Ridge', lasso: 'Lasso',
   };
   const wanted = map[selectedModel];
   if (wanted && candidates[wanted]) return { [wanted]: candidates[wanted] };

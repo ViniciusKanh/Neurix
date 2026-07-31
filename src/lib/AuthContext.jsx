@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import { base44, tokenStore } from '@/api/base44Client';
+import { queryClientInstance } from '@/lib/query-client';
 
 const AuthContext = createContext();
 
@@ -11,6 +12,7 @@ export const AuthProvider = ({ children }) => {
 
   const setSession = useCallback((token, u) => {
     tokenStore.set(token);
+    try { queryClientInstance.clear(); } catch { /* ignore */ } // avoid cross-user cache bleed
     setUser(u);
     setIsAuthenticated(true);
     setAuthError(null);
@@ -66,6 +68,7 @@ export const AuthProvider = ({ children }) => {
 
   const logout = useCallback(() => {
     base44.auth.logout();
+    try { queryClientInstance.clear(); } catch { /* ignore */ }
     setUser(null);
     setIsAuthenticated(false);
   }, []);
