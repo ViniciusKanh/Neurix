@@ -115,8 +115,7 @@ function fileToBase64(file) {
 // Fills an object matching the top-level properties of a JSON schema with
 // neutral values — used so legacy InvokeLLM callers don't crash.
 function neutralFromSchema(schema) {
-  const notice = 'IA externa desativada — Neurix opera 100% local (ML sem LLM).';
-  if (!schema || !schema.properties) return { disabled: true, message: notice };
+  if (!schema || !schema.properties) return { disabled: true, message: '' };
   const out = {};
   for (const [key, def] of Object.entries(schema.properties)) {
     const t = def.type;
@@ -124,7 +123,7 @@ function neutralFromSchema(schema) {
     else if (t === 'number' || t === 'integer') out[key] = 0;
     else if (t === 'boolean') out[key] = false;
     else if (t === 'object') out[key] = {};
-    else out[key] = notice;
+    else out[key] = '';
   }
   out.disabled = true;
   return out;

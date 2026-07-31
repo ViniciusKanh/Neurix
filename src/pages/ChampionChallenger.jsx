@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils';
 
 const COLORS = ['hsl(187,92%,55%)', 'hsl(265,70%,60%)', 'hsl(152,68%,50%)', 'hsl(35,92%,60%)'];
 const TOOLTIP_STYLE = { background: 'hsl(222, 40%, 9%)', border: '1px solid hsl(222, 25%, 16%)', borderRadius: '8px', color: '#fff', fontSize: '11px' };
-const TABS = [{ id: 'overview', label: 'Visão Geral' }, { id: 'metrics', label: 'Métricas' }, { id: 'scatter', label: 'Dispersão' }, { id: 'radar', label: 'Radar' }, { id: 'ai', label: 'Veredicto IA' }];
+const TABS = [{ id: 'overview', label: 'Visão Geral' }, { id: 'metrics', label: 'Métricas' }, { id: 'scatter', label: 'Dispersão' }, { id: 'radar', label: 'Radar' }, { id: 'ai', label: 'Veredicto' }];
 
 const BATCH_SCENARIOS = [
   { id: 'balanced', label: 'Dados balanceados', description: 'Batch representativo com distribuição similar ao treino' },
@@ -58,81 +58,9 @@ export default function ChampionChallenger() {
     setIsRunning(true);
     setResult(null);
 
-    const scenarioDesc = BATCH_SCENARIOS.find(s => s.id === scenario);
-    const res = await base44.integrations.Core.InvokeLLM({
-      prompt: `Você é especialista em avaliação de modelos de ML. Faça uma comparação Champion vs Challenger detalhada e realista.
-
-PROJETO: ${project.name}
-DATASET: ${project.dataset_filename} (${project.dataset_size} linhas, ${project.dataset_columns} colunas)
-Colunas: ${JSON.stringify((project.column_info || []).slice(0, 15))}
-
-CHAMPION (modelo atual em produção):
-- Nome: ${champion?.name}
-- Tipo: ${champion?.type}
-- Configuração: ${JSON.stringify(champion?.config || {})}
-- Métricas atuais: ${JSON.stringify(champion?.results?.metrics || {})}
-- Resultado: ${JSON.stringify(champion?.results || {})}
-
-CHALLENGER (novo candidato):
-- Nome: ${challenger?.name}
-- Tipo: ${challenger?.type}
-- Configuração: ${JSON.stringify(challenger?.config || {})}
-- Métricas atuais: ${JSON.stringify(challenger?.results?.metrics || {})}
-- Resultado: ${JSON.stringify(challenger?.results || {})}
-
-BATCH: ${batchSize} amostras | Cenário: ${scenarioDesc?.label} — ${scenarioDesc?.description}
-
-Simule a execução dos DOIS modelos no mesmo batch e retorne JSON:
-{
-  "batch_info": {"size": number, "scenario": string, "description": string},
-  "champion": {
-    "name": string, "type": string,
-    "batch_metrics": {"accuracy": number, "f1": number, "precision": number, "recall": number, "auc_roc": number, "avg_latency_ms": number, "throughput_per_sec": number},
-    "predictions_sample": [{"actual": string, "predicted": string, "confidence": number}],
-    "confusion_matrix_summary": {"true_positives": number, "false_positives": number, "true_negatives": number, "false_negatives": number},
-    "strengths": [string], "weaknesses": [string]
-  },
-  "challenger": {
-    "name": string, "type": string,
-    "batch_metrics": {"accuracy": number, "f1": number, "precision": number, "recall": number, "auc_roc": number, "avg_latency_ms": number, "throughput_per_sec": number},
-    "predictions_sample": [{"actual": string, "predicted": string, "confidence": number}],
-    "confusion_matrix_summary": {"true_positives": number, "false_positives": number, "true_negatives": number, "false_negatives": number},
-    "strengths": [string], "weaknesses": [string]
-  },
-  "metric_comparison": [{"metric": string, "champion": number, "challenger": number, "winner": "champion"|"challenger"|"tie", "delta_pct": number}],
-  "scatter_data": [{"index": number, "champion_conf": number, "challenger_conf": number, "actual": string}],
-  "winner": "champion" | "challenger" | "tie",
-  "winner_reason": string,
-  "confidence_level": "high" | "medium" | "low",
-  "recommendation": "promote_challenger" | "keep_champion" | "more_testing",
-  "recommendation_detail": string,
-  "statistical_significance": boolean,
-  "p_value": number,
-  "effect_size": number,
-  "business_impact": string,
-  "ai_verdict": string (markdown detalhado em português: análise completa com contexto estatístico, impacto de negócio, riscos de trocar o modelo e recomendação final fundamentada)
-}`,
-      response_json_schema: {
-        type: "object",
-        properties: {
-          batch_info: { type: "object" },
-          champion: { type: "object" },
-          challenger: { type: "object" },
-          metric_comparison: { type: "array", items: { type: "object" } },
-          scatter_data: { type: "array", items: { type: "object" } },
-          winner: { type: "string" },
-          winner_reason: { type: "string" },
-          confidence_level: { type: "string" },
-          recommendation: { type: "string" },
-          recommendation_detail: { type: "string" },
-          statistical_significance: { type: "boolean" },
-          p_value: { type: "number" },
-          effect_size: { type: "number" },
-          business_impact: { type: "string" },
-          ai_verdict: { type: "string" },
-        }
-      }
-    });
+    await new Promise(r => setTimeout(r, 400));
+    const { compareModels } = await import('@/lib/localChampionChallenger');
+    const res = compareModels(champion, challenger, { scenario, batchSize: parseInt(batchSize) || 1000 });
 
     setResult(res);
     setIsRunning(false);

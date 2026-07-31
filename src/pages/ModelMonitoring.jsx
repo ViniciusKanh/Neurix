@@ -17,7 +17,7 @@ import { ptBR } from 'date-fns/locale';
 
 const COLORS = ['hsl(187,92%,55%)', 'hsl(265,70%,60%)', 'hsl(152,68%,50%)', 'hsl(35,92%,60%)'];
 const TOOLTIP_STYLE = { background: 'hsl(222, 40%, 9%)', border: '1px solid hsl(222, 25%, 16%)', borderRadius: '8px', color: '#fff', fontSize: '11px' };
-const TABS = [{ id: 'drift', label: 'Data Drift' }, { id: 'columns', label: 'Colunas' }, { id: 'performance', label: 'Performance' }, { id: 'alerts', label: 'Alertas' }, { id: 'ai', label: 'Análise IA' }];
+const TABS = [{ id: 'drift', label: 'Data Drift' }, { id: 'columns', label: 'Colunas' }, { id: 'performance', label: 'Performance' }, { id: 'alerts', label: 'Alertas' }, { id: 'ai', label: 'Análise' }];
 
 function DriftBadge({ score }) {
   if (score == null) return null;
@@ -69,68 +69,14 @@ export default function ModelMonitoring() {
     setIsAnalyzing(true);
     setResult(null);
 
-    const scenarioDesc = SIMULATION_SCENARIOS.find(s => s.id === scenario);
-
-    const res = await base44.integrations.Core.InvokeLLM({
-      prompt: `Você é um especialista em MLOps. Simule uma análise completa de Data Drift para monitoramento de modelo em produção.
-
-PROJETO: ${project.name} (${project.dataset_filename})
-MODELO: ${selectedAnalysis?.name || 'Análise geral do projeto'} ${selectedAnalysis ? `(${selectedAnalysis.type})` : ''}
-Métricas originais do modelo: ${JSON.stringify(selectedAnalysis?.results?.metrics || {})}
-Dataset de treino: ${project.dataset_size} linhas, ${project.dataset_columns} colunas
-Colunas: ${JSON.stringify((project.column_info || []).slice(0, 20))}
-Dados de amostra: ${JSON.stringify((project.data_sample || []).slice(0, 5))}
-
-CENÁRIO DE BATCH SIMULADO: ${scenarioDesc?.label}
-Descrição: ${scenarioDesc?.description}
-Tamanho do batch simulado: ${customBatchSize} linhas
-
-Com base no cenário "${scenario}", simule como o batch de produção difere do treino. Seja realista e consistente com o cenário escolhido.
-
-Retorne JSON:
-{
-  "batch_summary": {"rows": number, "columns_matched": number, "columns_missing": number, "scenario_simulated": string},
-  "overall_drift_score": number (0-1, condizente com cenário),
-  "drift_severity": "none"|"low"|"medium"|"high"|"critical",
-  "column_drift": [{"column": string, "drift_score": number, "method": string, "p_value": number, "original_mean": number, "batch_mean": number, "original_std": number, "batch_std": number, "is_drifted": boolean, "drift_type": string, "impact_on_model": string}],
-  "performance_estimate": {
-    "estimated_accuracy_drop": number,
-    "estimated_current_accuracy": number,
-    "reliability_score": number,
-    "retraining_recommended": boolean,
-    "estimated_metrics": object,
-    "performance_degradation_reason": string
-  },
-  "drift_timeline": [{"period": string, "drift_score": number}] (6 períodos simulados),
-  "alerts": [{"severity": "critical"|"warning"|"info", "column": string, "message": string, "action": string}],
-  "distribution_comparison": [{"feature": string, "original": number, "batch": number}],
-  "retraining_trigger": {"should_trigger": boolean, "reason": string, "urgency": "immediate"|"soon"|"monitor"|"none"},
-  "ai_analysis": string (markdown completo em português, analise o que o drift significa para o negócio)
-}
-
-Gere 8-12 colunas na análise. Toda resposta em português.`,
-      response_json_schema: {
-        type: "object",
-        properties: {
-          batch_summary: { type: "object" },
-          overall_drift_score: { type: "number" },
-          drift_severity: { type: "string" },
-          column_drift: { type: "array", items: { type: "object" } },
-          performance_estimate: { type: "object" },
-          drift_timeline: { type: "array", items: { type: "object" } },
-          alerts: { type: "array", items: { type: "object" } },
-          distribution_comparison: { type: "array", items: { type: "object" } },
-          retraining_trigger: { type: "object" },
-          ai_analysis: { type: "string" },
-        }
-      }
-    });
+    await new Promise(r => setTimeout(r, 400));
+    const { computeDrift } = await import('@/lib/localMonitoring');
+    const res = computeDrift(project, { scenario, batchSize: customBatchSize, model: selectedAnalysis });
 
     setResult(res);
     setIsAnalyzing(false);
     setActiveTab('drift');
 
-    // Check if should trigger AutoML
     if (res.retraining_trigger?.should_trigger && res.overall_drift_score > 0.2) {
       setTriggerAutoML(true);
     }
@@ -144,26 +90,38 @@ Gere 8-12 colunas na análise. Toda resposta em português.`,
     setCandidateResult(null);
     setShowApproval(false);
 
-    // Step 1: AutoML retraining
+    // Step 1: AutoML retraining (local simulation based on the current model)
     setPipelineStep('automl');
-    const automlRes = await base44.integrations.Core.InvokeLLM({
-      prompt: `Simule um retreinamento AutoML para o projeto "${project.name}" após detecção de drift.
-Dataset: ${project.dataset_size} linhas, ${project.dataset_columns} colunas.
-Motivo do retreinamento: ${result?.retraining_trigger?.reason || 'drift detectado'}.
-Retorne JSON com: { best_model: string, accuracy: number, f1: number, auc: number, training_time_minutes: number, improvement_over_previous: number, leaderboard: [{model: string, score: number}] }`,
-      response_json_schema: { type: 'object', properties: { best_model: {type:'string'}, accuracy: {type:'number'}, f1: {type:'number'}, auc: {type:'number'}, training_time_minutes: {type:'number'}, improvement_over_previous: {type:'number'}, leaderboard: {type:'array', items:{type:'object'}} } }
-    });
+    await new Promise(r => setTimeout(r, 900));
+    const baseAcc = selectedAnalysis?.results?.metrics?.accuracy ?? selectedAnalysis?.results?.metrics?.r2 ?? 0.82;
+    const dropped = result?.performance_estimate?.estimated_current_accuracy ?? baseAcc;
+    const recovered = Math.min(0.99, Math.max(dropped, baseAcc) + 0.02);
+    const improvement = ((recovered - dropped) / Math.max(dropped, 0.01)) * 100;
+    const candidateModels = ['XGBoost', 'Random Forest', 'Gradient Boosting', 'Regressão Logística'];
+    const automlRes = {
+      best_model: candidateModels[0],
+      accuracy: Number(recovered.toFixed(3)),
+      f1: Number(Math.max(0, recovered - 0.02).toFixed(3)),
+      auc: Number(Math.min(0.99, recovered + 0.01).toFixed(3)),
+      training_time_minutes: Number((1 + Math.random() * 4).toFixed(1)),
+      improvement_over_previous: Number(improvement.toFixed(1)),
+      leaderboard: candidateModels.map((mo, i) => ({ model: mo, score: Number((recovered - i * 0.03).toFixed(3)) })),
+    };
 
-    // Step 2: Evaluate candidate
+    // Step 2: Evaluate candidate (local rule)
     setPipelineStep('evaluate');
     await new Promise(r => setTimeout(r, 800));
-    const evalRes = await base44.integrations.Core.InvokeLLM({
-      prompt: `Avalie o modelo candidato "${automlRes.best_model}" treinado para o projeto "${project.name}".
-Métricas: acurácia=${automlRes.accuracy?.toFixed(3)}, F1=${automlRes.f1?.toFixed(3)}, AUC=${automlRes.auc?.toFixed(3)}.
-Melhora sobre versão anterior: ${automlRes.improvement_over_previous?.toFixed(1)}%.
-O modelo deve ser aprovado para deploy? Retorne JSON: { approved: boolean, recommendation: string, risks: [string], confidence_level: string }`,
-      response_json_schema: { type: 'object', properties: { approved: {type:'boolean'}, recommendation: {type:'string'}, risks: {type:'array', items:{type:'string'}}, confidence_level: {type:'string'} } }
-    });
+    const approved = automlRes.improvement_over_previous > 1.5;
+    const evalRes = {
+      approved,
+      recommendation: approved
+        ? `Promover "${automlRes.best_model}": recupera ${automlRes.improvement_over_previous.toFixed(1)}% de desempenho perdido com o drift.`
+        : 'Ganho pequeno — manter o modelo atual e continuar monitorando.',
+      risks: approved
+        ? ['Validar em dados reais antes do deploy definitivo.', 'Monitorar drift após promoção.']
+        : ['Retreinar novamente quando houver mais dados novos.'],
+      confidence_level: automlRes.improvement_over_previous > 5 ? 'high' : automlRes.improvement_over_previous > 1.5 ? 'medium' : 'low',
+    };
 
     // Step 3: Notify
     setPipelineStep('notify');
