@@ -18,6 +18,8 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
 import { runClassification, runRegression } from '@/lib/localML';
+import { runRealClassification, runRealRegression, makeModel } from '@/lib/realML';
+import { getDataset } from '@/lib/datasetStore';
 
 const TASK_LABELS = {
   classification: 'Classificação',
@@ -80,6 +82,8 @@ export default function Inference() {
   const [feedbackGiven, setFeedbackGiven] = useState(false);
   const [actualValue, setActualValue] = useState('');
   const [isRetraining, setIsRetraining] = useState(false);
+  const [model, setModel] = useState(null); // real predictor (makeModel)
+  const [modelState, setModelState] = useState('none'); // none|loading|ready|missing
   const queryClient = useQueryClient();
 
   const { data: analyses = [], isLoading } = useQuery({
@@ -122,6 +126,25 @@ export default function Inference() {
     setActualValue('');
   };
 
+  // Build a REAL predictor from the local dataset whenever the analysis changes.
+  React.useEffect(() => {
+    let alive = true;
+    setModel(null);
+    if (!analysis || !project || !targetCol) { setModelState('none'); return; }
+    setModelState('loading');
+    (async () => {
+      try {
+        const d = await getDataset(project.id);
+        if (!alive) return;
+        if (!d?.rows?.length || d.rows.length < 10) { setModelState('missing'); return; }
+        const mdl = makeModel(d.rows, targetCol, project.column_info, analysis.type, analysis.results?.best_model || 'auto');
+        if (!alive) return;
+        if (mdl) { setModel(mdl); setModelState('ready'); } else { setModelState('missing'); }
+      } catch { if (alive) setModelState('missing'); }
+    })();
+    return () => { alive = false; };
+  }, [selectedAnalysisId, project?.id, targetCol]); // eslint-disable-line
+
   const handleInputChange = (col, value) => {
     setInputs(prev => ({ ...prev, [col]: value }));
   };
@@ -139,8 +162,21 @@ export default function Inference() {
     setFeedbackGiven(false);
     setActualValue('');
 
-    await new Promise(r => setTimeout(r, 500));
-    const result = predictLocally(analysis, project, inputs);
+    await new Promise(r => setTimeout(r, 120));
+    let result;
+    if (model && modelState === 'ready') {
+      // REAL prediction on the trained model (probabilities included).
+      const out = model.predict(inputs);
+      let confidence = null;
+      if (analysis.type === 'classification' && model.proba) {
+        const p = model.proba(inputs);
+        if (p) confidence = Math.max(...p);
+      }
+      result = { predicted: String(out.value), confidence, real: true };
+    } else {
+      // Fallback heuristic (dataset not on this device).
+      result = { ...predictLocally(analysis, project, inputs), real: false };
+    }
     setPrediction(result);
     setIsPredicting(false);
   };
@@ -193,25 +229,26 @@ export default function Inference() {
         },
       });
 
-      await new Promise(r => setTimeout(r, 1500));
-      let result;
-      if (analysis.type === 'classification') {
-        result = runClassification(project, targetCol, analysis.config?.split || '80/20', analysis.config?.cv || 'K-Fold (5)', analysis.config?.balancing || 'Nenhum');
-        // Slightly adjust metrics to reflect "learning" from feedback
-        const boost = Math.min(0.05, feedbackCount * 0.005);
-        if (result.metrics) {
-          result.metrics.accuracy = Math.min(0.99, result.metrics.accuracy + boost);
-          result.metrics.f1_score = Math.min(0.99, result.metrics.f1_score + boost);
-        }
-        result.interpretation += `\n\n**Retreinamento com ${feedbackCount} amostras de feedback.** Métricas ajustadas (+${(boost * 100).toFixed(1)}%) com base no feedback do usuário.`;
-      } else {
-        result = runRegression(project, targetCol, analysis.config?.split || '80/20', analysis.config?.cv || 'K-Fold (5)');
-        const boost = Math.min(0.04, feedbackCount * 0.004);
-        if (result.metrics) {
-          result.metrics.r2_score = Math.min(0.99, result.metrics.r2_score + boost);
-        }
-        result.interpretation += `\n\n**Retreinamento com ${feedbackCount} amostras de feedback.** R² ajustado (+${(boost * 100).toFixed(1)}%) com base no feedback do usuário.`;
+      await new Promise(r => setTimeout(r, 200));
+      // Real retraining on the FULL local dataset when available.
+      let rows = [];
+      try { const d = await getDataset(analysis.project_id); rows = (d && d.rows) || []; } catch { rows = []; }
+      const cols = project.column_info || [];
+      const selModel = analysis.config?.selected_model || 'all';
+      let result, realUsed = false;
+      if (rows.length >= 20) {
+        result = analysis.type === 'classification'
+          ? runRealClassification(rows, targetCol, cols, 0.2, selModel)
+          : runRealRegression(rows, targetCol, cols, 0.2, selModel);
+        realUsed = result && !result.error;
       }
+      if (!realUsed) {
+        result = analysis.type === 'classification'
+          ? runClassification(project, targetCol, analysis.config?.split || '80/20', analysis.config?.cv || 'K-Fold (5)', analysis.config?.balancing || 'Nenhum')
+          : runRegression(project, targetCol, analysis.config?.split || '80/20', analysis.config?.cv || 'K-Fold (5)');
+      }
+      result.training_mode = realUsed ? 'real' : 'estimado';
+      result.interpretation = (result.interpretation || '') + `\n\n**Retreinamento registrado com ${feedbackCount} amostra(s) de feedback.** ${realUsed ? 'Modelo re-treinado de verdade sobre o dataset local.' : 'Estimativa — reenvie o dataset no ML Studio para re-treino real.'}`;
 
       await base44.entities.Analysis.update(newAnalysis.id, {
         status: 'completed',
@@ -289,10 +326,20 @@ export default function Inference() {
                     {featureCols.length} features · Alvo: <span className="text-primary font-mono">{targetCol}</span>
                   </p>
                 </div>
-                <Badge className="bg-secondary text-muted-foreground">
-                  {analysis.results?.best_model || 'Modelo'}
-                </Badge>
+                <div className="flex flex-col items-end gap-1">
+                  <Badge className="bg-secondary text-muted-foreground">
+                    {analysis.results?.best_model || 'Modelo'}
+                  </Badge>
+                  <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-semibold ${modelState === 'ready' ? 'bg-accent/15 text-accent' : modelState === 'loading' ? 'bg-secondary text-muted-foreground' : 'bg-amber-400/15 text-amber-400'}`}>
+                    {modelState === 'ready' ? '✓ Preditor real' : modelState === 'loading' ? 'preparando…' : '~ heurística (sem dataset local)'}
+                  </span>
+                </div>
               </div>
+              {modelState === 'missing' && (
+                <p className="text-[10px] text-amber-400 mb-3 -mt-2">
+                  O dataset não está neste dispositivo — a predição usa uma aproximação. Reenvie no ML Studio para predição real.
+                </p>
+              )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {featureCols.map(col => (

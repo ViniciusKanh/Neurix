@@ -797,6 +797,153 @@ export function permutationImportance(rows, targetColumn, columnInfo, task, mode
   return { task, baseline: r4(baseline), metric: task === 'classification' ? 'Acurácia' : 'R²', importances: out, trained_on: ds.X.length };
 }
 
+// ---------- parameterized fits (for real hyperparameter search) ----------
+// Returns a predictor over encoded vectors, honoring the given hyperparameters.
+function fitWithHyper(X, y, task, modelName, K, hyper = {}) {
+  const pick = normalizeModelName(modelName, task);
+  const rf = seededRand(999);
+  if (task === 'classification') {
+    if (pick === 'tree') { const imp = {}; const tree = buildTree(X, y, 'classification', 0, hyper.max_depth ?? 10, hyper.min_split ?? 8, imp); return { predict: (xs) => predictTree(tree, xs) }; }
+    if (pick === 'rf') return fitRandomForest(X, y, 'classification', rf, hyper.n_trees ?? 12);
+    if (pick === 'gb') return fitGBClass(X, y, K, hyper.rounds ?? 22, hyper.learning_rate ?? 0.3, hyper.max_depth ?? 3);
+    if (pick === 'svm') return fitSVM(X, y, K, hyper.epochs ?? 180, hyper.learning_rate ?? 0.05, hyper.lambda ?? 0.001);
+    if (pick === 'knn') return fitKNNModel(X, y, 'classification', hyper.k ?? 5);
+    if (pick === 'nb') return fitNBModel(X, y, K);
+    return fitSoftmax(X, y, K, hyper.epochs ?? 250, hyper.learning_rate ?? 0.3);
+  }
+  if (pick === 'tree') { const imp = {}; const tree = buildTree(X, y, 'regression', 0, hyper.max_depth ?? 10, hyper.min_split ?? 8, imp); return { predict: (xs) => predictTree(tree, xs) }; }
+  if (pick === 'rf') return fitRandomForest(X, y, 'regression', rf, hyper.n_trees ?? 12);
+  if (pick === 'gb') return fitGBReg(X, y, hyper.rounds ?? 25, hyper.learning_rate ?? 0.2, hyper.max_depth ?? 3);
+  if (pick === 'ridge') return fitLinearPenalized(X, y, 'l2', hyper.alpha ?? 0.5);
+  if (pick === 'lasso') return fitLinearPenalized(X, y, 'l1', hyper.alpha ?? 0.1);
+  if (pick === 'knn') return fitKNNModel(X, y, 'regression', hyper.k ?? 5);
+  return fitLinear(X, y, hyper.epochs ?? 400, hyper.learning_rate ?? 0.1);
+}
+
+// Per-model hyperparameter search spaces (the knobs that actually matter).
+export function hyperSpace(modelName, task) {
+  const pick = normalizeModelName(modelName, task);
+  const S = {
+    knn: [{ name: 'k', type: 'int', min: 1, max: 25 }],
+    tree: [{ name: 'max_depth', type: 'int', min: 3, max: 16 }, { name: 'min_split', type: 'int', min: 2, max: 20 }],
+    rf: [{ name: 'n_trees', type: 'int', min: 6, max: 40 }, { name: 'max_depth', type: 'int', min: 4, max: 14 }],
+    gb: [{ name: 'rounds', type: 'int', min: 10, max: 60 }, { name: 'learning_rate', type: 'float', min: 0.05, max: 0.5 }, { name: 'max_depth', type: 'int', min: 2, max: 5 }],
+    svm: [{ name: 'lambda', type: 'float', min: 0.0001, max: 0.05 }, { name: 'epochs', type: 'int', min: 80, max: 300 }],
+    ridge: [{ name: 'alpha', type: 'float', min: 0.05, max: 5 }],
+    lasso: [{ name: 'alpha', type: 'float', min: 0.02, max: 2 }],
+    logistic: [{ name: 'learning_rate', type: 'float', min: 0.05, max: 0.6 }, { name: 'epochs', type: 'int', min: 120, max: 400 }],
+    linear: [{ name: 'learning_rate', type: 'float', min: 0.02, max: 0.4 }, { name: 'epochs', type: 'int', min: 200, max: 600 }],
+    nb: [],
+  };
+  return { model: pick, params: S[pick] || [] };
+}
+
+// Real hyperparameter search (random search) scored by k-fold CV on the local data.
+export function hyperSearch(rows, targetColumn, columnInfo, task, modelName, nTrials = 20, k = 4) {
+  const ds = buildDataset(rows, targetColumn, columnInfo, task);
+  if (ds.X.length < 30) return { error: true, message: 'Busca de hiperparâmetros requer ≥ 30 linhas.' };
+  const K = ds.classes ? ds.classes.length : 0;
+  if (task === 'classification' && K < 2) return { error: true, message: 'A coluna-alvo precisa de ≥ 2 classes.' };
+  const space = hyperSpace(modelName, task);
+  const rand = seededRand(4242);
+  const idx = shuffleIdx(ds.X.length, rand);
+  const folds = Array.from({ length: k }, () => []);
+  idx.forEach((v, i) => folds[i % k].push(v));
+
+  const sampleParams = () => {
+    const p = {};
+    space.params.forEach((sp) => {
+      const raw = sp.min + rand() * (sp.max - sp.min);
+      p[sp.name] = sp.type === 'int' ? Math.round(raw) : Number(raw.toFixed(4));
+    });
+    return p;
+  };
+  const cvScore = (hyper) => {
+    const scores = [];
+    for (let f = 0; f < k; f++) {
+      const testI = new Set(folds[f]);
+      const Xtr = [], ytr = [], Xte = [], yte = [];
+      for (let i = 0; i < ds.X.length; i++) (testI.has(i) ? (Xte.push(ds.X[i]), yte.push(ds.y[i])) : (Xtr.push(ds.X[i]), ytr.push(ds.y[i])));
+      if (Xtr.length < 5 || !Xte.length) continue;
+      const model = fitWithHyper(Xtr, ytr, task, modelName, K, hyper);
+      const pred = Xte.map((x) => model.predict(x));
+      scores.push(task === 'classification' ? scoreClass(yte, pred, K).f1 : r2of(yte, pred));
+    }
+    return { mean: mean(scores), std: stdOf(scores) };
+  };
+
+  const seen = new Set(); const trials = [];
+  // Always include the default (no-tuning) baseline as trial 1.
+  const candidates = [{}];
+  for (let t = 0; t < nTrials - 1; t++) candidates.push(sampleParams());
+  candidates.forEach((hyper, i) => {
+    const key = JSON.stringify(hyper); if (seen.has(key)) return; seen.add(key);
+    const s = cvScore(hyper);
+    trials.push({ trial: i + 1, params: hyper, score: r4(s.mean), cv_std: r4(s.std) });
+  });
+  trials.sort((a, b) => b.score - a.score);
+  const best = trials[0];
+  return {
+    task, model: space.model, metric: task === 'classification' ? 'F1 (macro)' : 'R²',
+    tunable: space.params.map((p) => p.name),
+    trials: trials.map((t, i) => ({ ...t, rank: i + 1 })),
+    best_params: best?.params || {}, best_score: best?.score ?? 0, best_std: best?.cv_std ?? 0,
+    n_trials: trials.length, trained_on: ds.X.length,
+  };
+}
+
+// Real-valued ranking score for the positive class (for ROC/PR). Uses a
+// model-appropriate score; returns null for models without one exposed.
+function binaryScores(pick, Xtr, ytr, Xte) {
+  if (pick === 'logistic') { const pm = softmaxProbaModel(Xtr, ytr, 2); return Xte.map((x) => pm.proba(x)[1]); }
+  if (pick === 'tree') { const t = buildTree(Xtr, ytr, 'regression', 0, 10, 8, {}); return Xte.map((x) => predictTree(t, x)); }
+  if (pick === 'gb') { const g = fitGBReg(Xtr, ytr, 25, 0.2, 3); return Xte.map((x) => g.predict(x)); }
+  if (pick === 'rf') { const rand = seededRand(313); const n = Xtr.length; const trees = []; for (let t = 0; t < 15; t++) { const idx = Array.from({ length: n }, () => Math.floor(rand() * n)); trees.push(buildTree(idx.map((i) => Xtr[i]), idx.map((i) => ytr[i]), 'regression', 0, 9, 6, {})); } return Xte.map((x) => mean(trees.map((tr) => predictTree(tr, x)))); }
+  if (pick === 'knn') { const k = 7; return Xte.map((x) => { const d = Xtr.map((t, i) => { let s = 0; for (let j = 0; j < x.length; j++) s += (x[j] - t[j]) ** 2; return [s, ytr[i]]; }); d.sort((a, b) => a[0] - b[0]); const top = d.slice(0, k); return mean(top.map((t) => t[1])); }); }
+  return null; // svm / nb: no calibrated ranking score exposed
+}
+
+// Real side-by-side comparison: holdout metrics + ROC/PR curve points per model.
+export function compareModelsReal(rows, targetColumn, columnInfo, task, modelNames, splitRatio = 0.25) {
+  const ds = buildDataset(rows, targetColumn, columnInfo, task);
+  if (ds.X.length < 20) return { error: true, message: 'Comparação requer ≥ 20 linhas.' };
+  const rand = seededRand(9090);
+  const { Xtr, ytr, Xte, yte } = split(ds.X, ds.y, splitRatio, rand);
+  const K = ds.classes ? ds.classes.length : 0;
+  const binary = task === 'classification' && K === 2;
+
+  const out = modelNames.map((name) => {
+    const model = fitByName(Xtr, ytr, task, name, K);
+    const pred = Xte.map((x) => model.predict(x));
+    if (task === 'classification') {
+      const m = classMetrics(yte, pred, K);
+      let roc = null, pr = null, auc = null;
+      const scores = binary ? binaryScores(normalizeModelName(name, task), Xtr, ytr, Xte) : null;
+      if (binary && scores) {
+        const pts = Xte.map((x, i) => ({ y: yte[i], s: scores[i] }));
+        // normalize scores to [0,1] for a common threshold sweep
+        const mn = Math.min(...scores), mx = Math.max(...scores), rng = (mx - mn) || 1;
+        pts.forEach((p) => { p.s = (p.s - mn) / rng; });
+        const P = pts.filter((p) => p.y === 1).length, N = pts.length - P;
+        roc = []; pr = [];
+        for (let t = 0; t <= 1.0001; t += 0.05) {
+          let TP = 0, FP = 0; pts.forEach((p) => { if (p.s >= t) { if (p.y === 1) TP++; else FP++; } });
+          roc.push({ fpr: N ? +(FP / N).toFixed(3) : 0, tpr: P ? +(TP / P).toFixed(3) : 0 });
+          pr.push({ recall: P ? +(TP / P).toFixed(3) : 0, precision: TP + FP ? +(TP / (TP + FP)).toFixed(3) : 1 });
+        }
+        // AUC via trapezoid over sorted-by-fpr ROC
+        const sorted = [...roc].sort((a, b) => a.fpr - b.fpr);
+        auc = 0; for (let i = 1; i < sorted.length; i++) auc += (sorted[i].fpr - sorted[i - 1].fpr) * (sorted[i].tpr + sorted[i - 1].tpr) / 2;
+        auc = Number(Math.abs(auc).toFixed(3));
+      }
+      return { name, task, metrics: { accuracy: m.accuracy, precision: m.precision, recall: m.recall, f1_score: m.f1_score, auc }, confusion: m.confusion_matrix, roc, pr };
+    }
+    const m = regMetrics(yte, pred);
+    return { name, task, metrics: m, roc: null, pr: null };
+  });
+  return { task, binary, classes: ds.classes, test_size: yte.length, positive_class: binary ? ds.classes[1] : null, models: out };
+}
+
 // Class distribution + imbalance diagnostics (classification only).
 export function classBalance(rows, targetColumn) {
   const counts = {};

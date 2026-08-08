@@ -10,7 +10,52 @@ import GlowCard from '@/components/ui/GlowCard';
 import ReactMarkdown from 'react-markdown';
 import { Zap, Play, Loader2, Trophy, Download, Sparkles, TrendingUp, Clock } from 'lucide-react';
 import { runAutoML } from '@/lib/localML';
+import { runRealClassification, runRealRegression, crossValidate } from '@/lib/realML';
+import { getDataset } from '@/lib/datasetStore';
 import { toast } from 'sonner';
+
+const COMPLEXITY = { 'Regressão Logística': 'low', 'Regressão Linear': 'low', 'Ridge': 'low', 'Lasso': 'low', 'Naive Bayes': 'low', 'KNN': 'medium', 'Árvore de Decisão': 'medium', 'SVM': 'medium', 'Random Forest': 'high', 'Gradient Boosting': 'high' };
+
+// Maps the real leaderboard (runRealClassification/Regression) to the AutoML view shape.
+function mapRealToAutoML(res, task, cv) {
+  const primaryKey = task === 'regression' ? 'r2_score' : 'f1_score';
+  const board = (res.models_comparison || []).map((m) => ({
+    model_name: m.name,
+    preprocessing: 'Padronização (z-score) + One-Hot Encoding',
+    primary_metric: m.metrics?.[primaryKey] ?? 0,
+    cv_score: null, cv_std: null,
+    overfitting_score: 0,
+    complexity: COMPLEXITY[m.name] || 'medium',
+    training_time: m.metrics?.training_time ?? 0,
+    _metrics: m.metrics,
+  }));
+  board.sort((a, b) => (b.primary_metric || 0) - (a.primary_metric || 0));
+  board.forEach((m, i) => { m.rank = i + 1; m.is_best = i === 0; });
+  if (cv && !cv.error && board[0]) { board[0].cv_score = cv.mean; board[0].cv_std = cv.std; }
+  const top = board[0];
+  return {
+    training_mode: 'real',
+    total_models_tested: board.length,
+    preprocessing_strategies_tested: 1,
+    total_time_seconds: board.reduce((s, m) => s + (m.training_time || 0), 0),
+    leaderboard: board,
+    best_model: top && {
+      name: top.model_name,
+      preprocessing: top.preprocessing,
+      why_best: `Melhor ${task === 'regression' ? 'R²' : 'F1'} entre ${board.length} modelos treinados sobre ${res.trained_on?.toLocaleString('pt-BR')} linhas (holdout de ${res.test_size} amostras)${cv && !cv.error ? `; validação cruzada ${cv.k}-fold: ${(cv.mean * 100).toFixed(1)}% ± ${(cv.std * 100).toFixed(1)}` : ''}.`,
+      hyperparameters: { engine: 'Neurix realML', seed: 'fixa (determinístico)', split: '80/20' },
+      full_metrics: top._metrics || {},
+      feature_importance: res.feature_importance || [],
+    },
+    feature_importance: res.feature_importance || [],
+    insights: [
+      `Melhor modelo: ${top?.model_name} (${((top?.primary_metric || 0) * 100).toFixed(1)}% de ${task === 'regression' ? 'R²' : 'F1'}).`,
+      cv && !cv.error ? `Validação cruzada ${cv.k}-fold confirma estabilidade (desvio ${(cv.std * 100).toFixed(1)}%).` : 'Ative a validação cruzada no ML Studio para confirmar estabilidade.',
+      (res.feature_importance || [])[0] ? `Variável mais influente: ${res.feature_importance[0].feature}.` : 'Avalie a importância de variáveis no Laboratório do Modelo.',
+    ],
+    ai_summary: res.interpretation || '',
+  };
+}
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { cn } from '@/lib/utils';
 
@@ -48,11 +93,34 @@ export default function AutoML() {
     if (!targetColumn) return toast.error('Selecione a coluna alvo');
     setIsRunning(true); setResult(null);
 
-    await new Promise(r => setTimeout(r, 1800)); // simulate training time
-    const res = runAutoML(project, targetColumn, taskType, timeBudget);
+    // Real leaderboard over the FULL local dataset; estimate only as fallback.
+    let rows = [];
+    try { const d = await getDataset(selectedProjectId); rows = (d && d.rows) || []; } catch { rows = []; }
+    const cols = project.column_info || [];
 
-    setResult(res); setIsRunning(false);
-    toast.success('AutoML Pipeline concluído!');
+    if (rows.length >= 20) {
+      try {
+        await new Promise(r => setTimeout(r, 50));
+        const res = taskType === 'classification'
+          ? runRealClassification(rows, targetColumn, cols, 0.2, 'all')
+          : runRealRegression(rows, targetColumn, cols, 0.2, 'all');
+        if (res && !res.error) {
+          let cv = null;
+          try { cv = crossValidate(rows, targetColumn, cols, taskType, res.best_model || 'auto', 5); } catch { /* holdout only */ }
+          setResult(mapRealToAutoML(res, taskType, cv));
+          setIsRunning(false);
+          toast.success(`AutoML real concluído sobre ${(res.trained_on || rows.length).toLocaleString('pt-BR')} linhas!`);
+          return;
+        }
+      } catch (e) { console.error('[AutoML] treino real falhou:', e); }
+    }
+
+    // Fallback (no local dataset): estimate, clearly labeled.
+    await new Promise(r => setTimeout(r, 600));
+    const est = runAutoML(project, targetColumn, taskType, timeBudget);
+    if (est) est.training_mode = 'estimado';
+    setResult(est); setIsRunning(false);
+    toast.success('AutoML concluído (estimativa — reenvie o dataset no ML Studio para treino real).');
   };
 
   const exportBestModel = () => {
@@ -106,6 +174,9 @@ export default function AutoML() {
           </Button>
           {result && (
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
+              <span className={`px-2 py-0.5 rounded-full font-semibold ${result.training_mode === 'real' ? 'bg-accent/15 text-accent' : 'bg-amber-400/15 text-amber-400'}`}>
+                {result.training_mode === 'real' ? '✓ Treino real' : '~ Estimativa'}
+              </span><span>·</span>
               <span>{result.total_models_tested} modelos</span><span>·</span>
               <span>{result.preprocessing_strategies_tested} estratégias</span><span>·</span>
               <Clock className="w-3 h-3" /><span>{result.total_time_seconds?.toFixed(0)}s</span>

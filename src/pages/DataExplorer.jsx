@@ -273,8 +273,8 @@ function CleaningPanel({ project }) {
     finally { setSaving(false); }
   };
 
-  if (state === 'loading') return <div className="flex items-center gap-2 text-sm text-muted-foreground py-12 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Carregando dataset local…</div>;
   if (state === 'missing') return <EmptyState icon={Eraser} title="Dataset não está neste dispositivo" description="O dataset fica salvo localmente. Recarregue o arquivo no ML Studio para limpar os dados." />;
+  if (state !== 'ready' || !rows || !report) return <div className="flex items-center gap-2 text-sm text-muted-foreground py-12 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Carregando dataset local…</div>;
 
   return (
     <div className="space-y-4">

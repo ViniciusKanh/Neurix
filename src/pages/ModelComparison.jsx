@@ -7,6 +7,8 @@ import EmptyState from '@/components/ui/EmptyState';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { GitCompare, Loader2, Trophy, Target, TrendingUp, Zap } from 'lucide-react';
+import { compareModelsReal } from '@/lib/realML';
+import { getDataset } from '@/lib/datasetStore';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import {
@@ -84,6 +86,7 @@ export default function ModelComparison() {
   const [selectedAnalyses, setSelectedAnalyses] = useState([]);
   const [isComparing, setIsComparing] = useState(false);
   const [comparisonData, setComparisonData] = useState(null);
+  const [compareMode, setCompareMode] = useState('estimado'); // 'real' | 'estimado'
   const [activeTab, setActiveTab] = useState('metrics');
 
   const { data: projects = [] } = useQuery({ queryKey: ['projects'], queryFn: () => base44.entities.Project.list('-updated_date', 50) });
@@ -104,46 +107,86 @@ export default function ModelComparison() {
     setIsComparing(true);
     setComparisonData(null);
 
-    // Gera dados de comparação a partir dos resultados reais das análises
-    const models = selected.map((a, i) => {
-      const metrics = a.results?.metrics || {};
-      const accuracy = metrics.accuracy ?? (0.72 + Math.random() * 0.22);
-      const auc = metrics.auc_roc ?? metrics.auc ?? (accuracy + (Math.random() - 0.4) * 0.08);
-      const f1 = metrics.f1_score ?? metrics.f1 ?? (accuracy - Math.random() * 0.05);
-      const precision = metrics.precision ?? (f1 + (Math.random() - 0.5) * 0.04);
-      const recall = metrics.recall ?? (f1 + (Math.random() - 0.5) * 0.04);
-      const rmse = metrics.rmse ?? (Math.random() * 20 + 5);
-      const r2 = metrics.r2_score ?? metrics.r2 ?? (accuracy);
+    const task = selected[0].type;
+    const project = projects.find((p) => p.id === selectedProjectId);
+    const target = selected[0].config?.target_column;
+    const cols = project?.column_info || [];
 
-      return {
-        id: a.id,
-        name: a.results?.best_model || a.name,
-        type: a.type,
-        color: COLORS[i % COLORS.length],
-        accuracy: Math.min(1, Math.max(0, accuracy)),
-        auc: Math.min(1, Math.max(0, auc)),
-        f1: Math.min(1, Math.max(0, f1)),
-        precision: Math.min(1, Math.max(0, precision)),
-        recall: Math.min(1, Math.max(0, recall)),
-        rmse, r2: Math.min(1, Math.max(0, r2)),
-        training_time: a.results?.training_time ?? (Math.random() * 120 + 10),
-        roc_curve: genROC(Math.min(1, Math.max(0.5, auc)), 25),
-        pr_curve: genPR(Math.min(1, Math.max(0.3, f1)), 25),
-        conf_matrix: genConfMatrix(Math.min(1, Math.max(0, accuracy))),
-        radar: [
-          { metric: 'Accuracy', value: Math.round(accuracy * 100) },
-          { metric: 'AUC-ROC', value: Math.round(auc * 100) },
-          { metric: 'F1-Score', value: Math.round(f1 * 100) },
-          { metric: 'Precision', value: Math.round(precision * 100) },
-          { metric: 'Recall', value: Math.round(recall * 100) },
-        ],
-      };
-    });
+    // Try REAL comparison over the local dataset (same holdout for all models).
+    let realRes = null;
+    if (task === 'classification' || task === 'regression') {
+      try {
+        const d = await getDataset(selectedProjectId);
+        const rows = (d && d.rows) || [];
+        if (rows.length >= 20 && target) {
+          const names = selected.map((a) => a.results?.best_model || a.name);
+          await new Promise((r) => setTimeout(r, 50));
+          const r = compareModelsReal(rows, target, cols, task, names, 0.25);
+          if (r && !r.error) realRes = r;
+        }
+      } catch (e) { console.warn('[Compare] real falhou:', e.message); }
+    }
+
+    let models;
+    if (realRes) {
+      setCompareMode('real');
+      models = selected.map((a, i) => {
+        const rm = realRes.models[i] || {};
+        const m = rm.metrics || {};
+        const acc = m.accuracy ?? 0, auc = m.auc ?? m.r2_score ?? 0, f1 = m.f1_score ?? 0, prec = m.precision ?? 0, rec = m.recall ?? 0;
+        let cm = null;
+        if (rm.confusion && rm.confusion.length === 2) cm = { tn: rm.confusion[0][0], fp: rm.confusion[0][1], fn: rm.confusion[1][0], tp: rm.confusion[1][1] };
+        return {
+          id: a.id, name: a.results?.best_model || a.name, type: a.type, color: COLORS[i % COLORS.length],
+          accuracy: acc, auc, f1, precision: prec, recall: rec,
+          rmse: m.rmse ?? null, r2: m.r2_score ?? null,
+          training_time: a.results?.metrics?.training_time ?? 0,
+          roc_curve: rm.roc ? [{ fpr: 0, tpr: 0 }, ...rm.roc, { fpr: 1, tpr: 1 }] : null,
+          pr_curve: rm.pr || null,
+          conf_matrix: cm,
+          radar: [
+            { metric: 'Accuracy', value: Math.round(acc * 100) },
+            { metric: 'AUC-ROC', value: Math.round(auc * 100) },
+            { metric: 'F1-Score', value: Math.round(f1 * 100) },
+            { metric: 'Precision', value: Math.round(prec * 100) },
+            { metric: 'Recall', value: Math.round(rec * 100) },
+          ],
+        };
+      });
+    } else {
+      // Fallback: stored metrics + clearly-labeled approximate curves.
+      setCompareMode('estimado');
+      models = selected.map((a, i) => {
+        const metrics = a.results?.metrics || {};
+        const accuracy = metrics.accuracy ?? 0.8;
+        const auc = metrics.auc_roc ?? metrics.auc ?? accuracy;
+        const f1 = metrics.f1_score ?? metrics.f1 ?? accuracy;
+        const precision = metrics.precision ?? f1;
+        const recall = metrics.recall ?? f1;
+        return {
+          id: a.id, name: a.results?.best_model || a.name, type: a.type, color: COLORS[i % COLORS.length],
+          accuracy: clamp(accuracy), auc: clamp(auc), f1: clamp(f1), precision: clamp(precision), recall: clamp(recall),
+          rmse: metrics.rmse ?? null, r2: clamp(metrics.r2_score ?? accuracy),
+          training_time: metrics.training_time ?? 0,
+          roc_curve: genROC(Math.min(1, Math.max(0.5, auc)), 25),
+          pr_curve: genPR(Math.min(1, Math.max(0.3, f1)), 25),
+          conf_matrix: genConfMatrix(clamp(accuracy)),
+          radar: [
+            { metric: 'Accuracy', value: Math.round(accuracy * 100) },
+            { metric: 'AUC-ROC', value: Math.round(auc * 100) },
+            { metric: 'F1-Score', value: Math.round(f1 * 100) },
+            { metric: 'Precision', value: Math.round(precision * 100) },
+            { metric: 'Recall', value: Math.round(recall * 100) },
+          ],
+        };
+      });
+    }
 
     setComparisonData(models);
     setIsComparing(false);
-    toast.success(`${models.length} modelos comparados!`);
+    toast.success(realRes ? `${models.length} modelos comparados (ROC/PR reais)!` : `${models.length} modelos comparados (métricas salvas — curvas aproximadas).`);
   };
+  const clamp = (v) => Math.min(1, Math.max(0, v ?? 0));
 
   const tabs = [
     { id: 'metrics', label: '📊 Métricas' },
@@ -207,6 +250,10 @@ export default function ModelComparison() {
 
       {comparisonData && (
         <div className="space-y-5">
+          <div className={`inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full font-semibold ${compareMode === 'real' ? 'bg-accent/15 text-accent' : 'bg-amber-400/15 text-amber-400'}`}>
+            {compareMode === 'real' ? '✓ Comparação real — mesmo conjunto de teste, curvas ROC/PR calculadas' : '~ Métricas salvas — curvas aproximadas (reenvie o dataset no ML Studio para curvas reais)'}
+          </div>
+
           {/* Winner banner */}
           {winner && (
             <GlowCard glowColor="success" className="border-emerald-400/30 flex items-center gap-4 py-3">
@@ -301,13 +348,16 @@ export default function ModelComparison() {
                     <Legend wrapperStyle={{ fontSize: '10px' }} />
                     {/* Linha diagonal (random classifier) */}
                     <Line data={[{ fpr: 0, tpr: 0 }, { fpr: 1, tpr: 1 }]} type="linear" dataKey="tpr" stroke="hsl(215,15%,35%)" strokeDasharray="4 4" dot={false} name="Random (AUC=0.50)" strokeWidth={1} />
-                    {comparisonData.map((m, i) => (
+                    {comparisonData.filter(m => m.roc_curve).map((m, i) => (
                       <Line key={i} data={m.roc_curve} type="monotone" dataKey="tpr" stroke={m.color} dot={false}
                         name={`${m.name} (AUC=${(m.auc * 100).toFixed(1)}%)`} strokeWidth={2.5} />
                     ))}
                   </LineChart>
                 </ResponsiveContainer>
               </div>
+              {comparisonData.filter(m => m.roc_curve).length === 0 && (
+                <p className="text-xs text-muted-foreground text-center mt-3">Curvas ROC disponíveis apenas para classificação binária com score de probabilidade.</p>
+              )}
             </GlowCard>
           )}
 
@@ -324,13 +374,16 @@ export default function ModelComparison() {
                     <YAxis dataKey="precision" domain={[0, 1]} tick={{ fontSize: 8, fill: 'hsl(215,20%,55%)' }} label={{ value: 'Precision', angle: -90, position: 'insideLeft', fontSize: 9, fill: 'hsl(215,20%,55%)' }} />
                     <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v) => v?.toFixed ? v.toFixed(3) : v} />
                     <Legend wrapperStyle={{ fontSize: '10px' }} />
-                    {comparisonData.map((m, i) => (
+                    {comparisonData.filter(m => m.pr_curve).map((m, i) => (
                       <Line key={i} data={m.pr_curve} type="monotone" dataKey="precision" stroke={m.color} dot={false}
                         name={`${m.name} (F1=${(m.f1 * 100).toFixed(1)}%)`} strokeWidth={2.5} />
                     ))}
                   </LineChart>
                 </ResponsiveContainer>
               </div>
+              {comparisonData.filter(m => m.pr_curve).length === 0 && (
+                <p className="text-xs text-muted-foreground text-center mt-3">Curvas PR disponíveis apenas para classificação binária.</p>
+              )}
             </GlowCard>
           )}
 
@@ -339,10 +392,13 @@ export default function ModelComparison() {
             <GlowCard>
               <h3 className="font-semibold text-sm mb-4">Matrizes de Confusão</h3>
               <div className={cn('grid gap-6', comparisonData.length <= 2 ? 'grid-cols-2' : comparisonData.length <= 3 ? 'grid-cols-3' : 'grid-cols-2 lg:grid-cols-4')}>
-                {comparisonData.map((m, i) => (
+                {comparisonData.filter(m => m.conf_matrix).map((m, i) => (
                   <ConfusionMatrix key={i} cm={m.conf_matrix} modelName={m.name} color={m.color} />
                 ))}
               </div>
+              {comparisonData.filter(m => m.conf_matrix).length === 0 && (
+                <p className="text-xs text-muted-foreground text-center">Matriz 2×2 disponível para classificação binária. Para regressão/multiclasse, veja as métricas na aba correspondente.</p>
+              )}
               <div className="mt-4 pt-4 border-t border-border/30">
                 <p className="text-[10px] text-muted-foreground"><span className="text-emerald-400 font-semibold">VP/VN</span> = acertos · <span className="text-destructive font-semibold">FP</span> = alarmes falsos · <span className="text-amber-400 font-semibold">FN</span> = casos perdidos</p>
               </div>

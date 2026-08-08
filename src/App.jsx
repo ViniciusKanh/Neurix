@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
@@ -6,43 +7,47 @@ import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import ErrorBoundary from '@/components/ErrorBoundary';
 
+// Shell + auth screens are eager (needed for first paint); the rest are
+// lazy-loaded per route to keep the initial bundle small.
 import AppLayout from './components/layout/AppLayout';
-import Dashboard from './pages/Dashboard';
-import Projects from './pages/Projects';
-import NewProject from './pages/NewProject';
-import ProjectView from './pages/ProjectView';
-import DataExplorer from './pages/DataExplorer';
-import MLStudio from './pages/MLStudio';
-
-import Visualization3D from './pages/Visualization3D';
-import Reports from './pages/Reports';
-import AssociationRules from './pages/AssociationRules';
-import ModelMonitoring from './pages/ModelMonitoring';
-import AutoML from './pages/AutoML';
-
-import Inference from './pages/Inference';
-
-import ChampionChallenger from './pages/ChampionChallenger';
-import TimeSeries from './pages/TimeSeries';
-
-
-import ModelDocumentation from './pages/ModelDocumentation';
-import ModelComparison from './pages/ModelComparison';
-import HyperparamTuning from './pages/HyperparamTuning';
-import ABTestPage from './pages/ABTestPage';
-import DatasetExport from './pages/DatasetExport';
-import PDFReportExporter from './pages/PDFReportExporter';
-import AnalyticsDashboard from './pages/AnalyticsDashboard';
-import AdvancedMLTests from './pages/AdvancedMLTests';
-import DataProfiling from './pages/DataProfiling';
-import PipelineExecutionHistory from './pages/PipelineExecutionHistory';
-import Deploy from './pages/Deploy';
-import ModelLab from './pages/ModelLab';
-import BatchScore from './pages/BatchScore';
 import Login from './pages/Login';
-import Settings from './pages/Settings';
-import UserManagement from './pages/UserManagement';
 import Privacy from './pages/Privacy';
+
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Projects = lazy(() => import('./pages/Projects'));
+const NewProject = lazy(() => import('./pages/NewProject'));
+const ProjectView = lazy(() => import('./pages/ProjectView'));
+const DataExplorer = lazy(() => import('./pages/DataExplorer'));
+const MLStudio = lazy(() => import('./pages/MLStudio'));
+const Visualization3D = lazy(() => import('./pages/Visualization3D'));
+const Reports = lazy(() => import('./pages/Reports'));
+const AssociationRules = lazy(() => import('./pages/AssociationRules'));
+const ModelMonitoring = lazy(() => import('./pages/ModelMonitoring'));
+const AutoML = lazy(() => import('./pages/AutoML'));
+const Inference = lazy(() => import('./pages/Inference'));
+const ChampionChallenger = lazy(() => import('./pages/ChampionChallenger'));
+const TimeSeries = lazy(() => import('./pages/TimeSeries'));
+const ModelDocumentation = lazy(() => import('./pages/ModelDocumentation'));
+const ModelComparison = lazy(() => import('./pages/ModelComparison'));
+const HyperparamTuning = lazy(() => import('./pages/HyperparamTuning'));
+const ABTestPage = lazy(() => import('./pages/ABTestPage'));
+const DatasetExport = lazy(() => import('./pages/DatasetExport'));
+const PDFReportExporter = lazy(() => import('./pages/PDFReportExporter'));
+const AnalyticsDashboard = lazy(() => import('./pages/AnalyticsDashboard'));
+const AdvancedMLTests = lazy(() => import('./pages/AdvancedMLTests'));
+const DataProfiling = lazy(() => import('./pages/DataProfiling'));
+const PipelineExecutionHistory = lazy(() => import('./pages/PipelineExecutionHistory'));
+const Deploy = lazy(() => import('./pages/Deploy'));
+const ModelLab = lazy(() => import('./pages/ModelLab'));
+const BatchScore = lazy(() => import('./pages/BatchScore'));
+const Settings = lazy(() => import('./pages/Settings'));
+const UserManagement = lazy(() => import('./pages/UserManagement'));
+
+const RouteFallback = () => (
+  <div className="flex items-center justify-center py-24">
+    <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+  </div>
+);
 
 
 const AuthenticatedApp = () => {
@@ -69,6 +74,7 @@ const AuthenticatedApp = () => {
   }
 
   return (
+    <Suspense fallback={<RouteFallback />}>
     <Routes>
       <Route element={<AppLayout />}>
         <Route path="/" element={<Dashboard />} />
@@ -110,6 +116,7 @@ const AuthenticatedApp = () => {
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
+    </Suspense>
   );
 };
 

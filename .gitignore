@@ -1,6 +1,7 @@
 node_modules
 dist
 dist_check
+dist_v2
 .vercel
 .env
 .env.local
