@@ -14,9 +14,12 @@ import QuickStatsPanel from '@/components/explorer/QuickStatsPanel';
 import ReactMarkdown from 'react-markdown';
 import {
   Database, BarChart2, Table2, AlertTriangle, Sparkles, Loader2,
-  TrendingUp, CheckCircle2, AlertCircle, PieChart, Hash, GitBranch, Scale, Boxes
+  TrendingUp, CheckCircle2, AlertCircle, PieChart, Hash, GitBranch, Scale, Boxes,
+  Eraser, Save, Copy, Wrench, Droplet
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { getDataset, saveDataset } from '@/lib/datasetStore';
+import { analyzeQuality, imputeNulls, dropDuplicates, coerceTypes } from '@/lib/dataQuality';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
   PieChart as RePieChart, Pie, Cell, ScatterChart, Scatter, ZAxis
@@ -35,6 +38,7 @@ const TABS = [
   { id: 'stats', label: 'Estatísticas', icon: Hash },
   { id: 'quality', label: 'Qualidade', icon: AlertCircle },
   { id: 'balancing', label: 'Balanceamento', icon: Scale },
+  { id: 'cleaning', label: 'Limpeza', icon: Eraser },
   { id: 'correlation', label: 'Correlação', icon: PieChart },
   { id: 'preview', label: 'Prévia', icon: Table2 },
   { id: 'ai', label: 'EDA (Análise)', icon: Sparkles },
@@ -224,6 +228,124 @@ function Metric({ label, value, sub }) {
       <p className="text-lg font-bold text-foreground">{value}</p>
       <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{label}</p>
       {sub && <p className="text-[10px] text-muted-foreground/70 truncate">{sub}</p>}
+    </div>
+  );
+}
+
+// Assisted cleaning over the LOCAL dataset (IndexedDB): impute, dedup, coerce.
+function CleaningPanel({ project }) {
+  const columns = project?.column_info || [];
+  const [state, setState] = useState('idle'); // idle | loading | ready | missing
+  const [rows, setRows] = useState(null);
+  const [report, setReport] = useState(null);
+  const [log, setLog] = useState([]);
+  const [strategy, setStrategy] = useState('median');
+  const [dirty, setDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  React.useEffect(() => {
+    let alive = true;
+    setState('loading'); setRows(null); setReport(null); setLog([]); setDirty(false);
+    (async () => {
+      try {
+        const d = await getDataset(project.id);
+        if (!alive) return;
+        if (!d?.rows?.length) { setState('missing'); return; }
+        setRows(d.rows); setReport(analyzeQuality(d.rows, columns)); setState('ready');
+      } catch { if (alive) setState('missing'); }
+    })();
+    return () => { alive = false; };
+  }, [project.id]); // eslint-disable-line
+
+  const apply = (fn, msg) => {
+    const r = fn(rows, columns, strategy);
+    setRows(r.rows); setReport(analyzeQuality(r.rows, columns)); setDirty(true);
+    setLog((l) => [...l, msg(r)]);
+  };
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await saveDataset(project.id, rows, columns, { filename: (project.dataset_filename || 'dataset') + ' (limpo)', size: rows.length });
+      toast.success('Dataset limpo salvo localmente. Retreine no ML Studio para usar os dados corrigidos.');
+      setDirty(false);
+    } catch (e) { toast.error('Falha ao salvar: ' + e.message); }
+    finally { setSaving(false); }
+  };
+
+  if (state === 'loading') return <div className="flex items-center gap-2 text-sm text-muted-foreground py-12 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Carregando dataset local…</div>;
+  if (state === 'missing') return <EmptyState icon={Eraser} title="Dataset não está neste dispositivo" description="O dataset fica salvo localmente. Recarregue o arquivo no ML Studio para limpar os dados." />;
+
+  return (
+    <div className="space-y-4">
+      <GlowCard>
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <h3 className="font-semibold text-foreground flex items-center gap-2"><Eraser className="w-4 h-4 text-primary" /> Limpeza assistida</h3>
+          <span className="text-xs text-muted-foreground">{rows.length.toLocaleString('pt-BR')} linhas · {columns.length} colunas</span>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+          <Metric label="Nulos" value={report.total_nulls.toLocaleString('pt-BR')} />
+          <Metric label="Duplicatas" value={report.duplicates.toLocaleString('pt-BR')} />
+          <Metric label="Colunas c/ problema" value={report.issues} />
+          <Metric label="Linhas" value={report.rows.toLocaleString('pt-BR')} />
+        </div>
+
+        <div className="flex flex-wrap items-end gap-2">
+          <div>
+            <label className="text-[10px] text-muted-foreground uppercase tracking-wider block mb-1">Imputação numérica</label>
+            <Select value={strategy} onValueChange={setStrategy}>
+              <SelectTrigger className="bg-secondary/50 w-40 h-9 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="median">Mediana (robusta)</SelectItem>
+                <SelectItem value="mean">Média</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <Button size="sm" variant="outline" onClick={() => apply(imputeNulls, (r) => `Imputados ${r.filled} valores nulos (${r.strategy}; categóricas por moda).`)} className="border-primary/40 text-primary hover:bg-primary/10">
+            <Droplet className="w-3.5 h-3.5 mr-1.5" /> Preencher nulos
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => apply((rw, ci) => dropDuplicates(rw, ci), (r) => `Removidas ${r.removed} linhas duplicadas.`)} className="border-primary/40 text-primary hover:bg-primary/10">
+            <Copy className="w-3.5 h-3.5 mr-1.5" /> Remover duplicatas
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => apply((rw, ci) => coerceTypes(rw, ci), (r) => `Convertidos ${r.coerced} valores para número.`)} className="border-primary/40 text-primary hover:bg-primary/10">
+            <Wrench className="w-3.5 h-3.5 mr-1.5" /> Corrigir tipos
+          </Button>
+          <div className="ml-auto">
+            <Button size="sm" onClick={save} disabled={!dirty || saving} className="bg-accent text-accent-foreground hover:bg-accent/90">
+              {saving ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-1.5" />} Salvar dataset limpo
+            </Button>
+          </div>
+        </div>
+
+        {log.length > 0 && (
+          <div className="mt-4 space-y-1 border-t border-border/30 pt-3">
+            {log.map((l, i) => <p key={i} className="text-[11px] text-muted-foreground flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3 text-emerald-400 flex-shrink-0" /> {l}</p>)}
+            {dirty && <p className="text-[11px] text-amber-400 mt-1">As alterações ainda não foram salvas. Clique em “Salvar dataset limpo”.</p>}
+          </div>
+        )}
+      </GlowCard>
+
+      <GlowCard>
+        <h3 className="font-semibold text-foreground mb-3 text-sm">Qualidade por coluna</h3>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead><tr className="bg-secondary/60">{['Coluna', 'Tipo', 'Nulos', '% Nulos', 'Únicos', 'Tipo inválido'].map((h) => <th key={h} className="text-left p-2 text-muted-foreground border-b border-border/40">{h}</th>)}</tr></thead>
+            <tbody>
+              {report.columns.map((c, i) => (
+                <tr key={c.name} className={i % 2 ? '' : 'bg-secondary/20'}>
+                  <td className="p-2 border-b border-border/20 font-mono text-foreground">{c.name}</td>
+                  <td className="p-2 border-b border-border/20 text-muted-foreground">{c.type}</td>
+                  <td className={cn('p-2 border-b border-border/20 font-mono', c.nulls > 0 ? 'text-amber-400' : 'text-emerald-400')}>{c.nulls}</td>
+                  <td className="p-2 border-b border-border/20 font-mono text-muted-foreground">{c.null_pct}%</td>
+                  <td className="p-2 border-b border-border/20 font-mono text-muted-foreground">{c.unique}</td>
+                  <td className={cn('p-2 border-b border-border/20 font-mono', c.type_mismatch > 0 ? 'text-destructive' : 'text-muted-foreground')}>{c.type_mismatch || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </GlowCard>
     </div>
   );
 }
@@ -749,6 +871,7 @@ export default function DataExplorer() {
             <BalancingPanel project={project} columns={columns} target={balanceTarget} setTarget={setBalanceTarget} />
           )}
 
+          {activeTab === 'cleaning' && <CleaningPanel project={project} />}
           {activeTab === 'correlation' && <CorrelationHeatmap project={project} />}
           {activeTab === 'preview' && <DataPreviewTable data={project.data_sample} columns={columns} />}
 

@@ -51,6 +51,7 @@ export default function ProjectView() {
   const quickLinks = [
     { icon: BarChart3, label: 'Explorador de Dados', path: `/explorer?project=${projectId}` },
     { icon: Brain, label: 'ML Studio', path: `/ml-studio?project=${projectId}` },
+    { icon: FlaskConical, label: 'Laboratório do Modelo', path: `/model-lab?project=${projectId}` },
     { icon: Rocket, label: 'Deploy', path: `/deploy?project=${projectId}` },
     { icon: FileText, label: 'Relatórios', path: `/reports?project=${projectId}` },
   ];

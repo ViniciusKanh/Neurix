@@ -40,6 +40,7 @@ export default function ModelMonitoring() {
   const [selectedAnalysisId, setSelectedAnalysisId] = useState('');
   const [scenario, setScenario] = useState('stable');
   const [customBatchSize, setCustomBatchSize] = useState('500');
+  const [driftThreshold, setDriftThreshold] = useState(0.15);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState(null);
   const [activeTab, setActiveTab] = useState('drift');
@@ -140,8 +141,10 @@ export default function ModelMonitoring() {
   };
 
   const overallScore = result?.overall_drift_score ?? 0;
-  const driftedCols = (result?.column_drift || []).filter(c => c.is_drifted);
-  const stableCols = (result?.column_drift || []).filter(c => !c.is_drifted);
+  // Column is "drifted" when its score meets the user-configured threshold.
+  const driftedCols = (result?.column_drift || []).filter(c => (c.drift_score || 0) >= driftThreshold);
+  const stableCols = (result?.column_drift || []).filter(c => (c.drift_score || 0) < driftThreshold);
+  const overThreshold = overallScore >= driftThreshold;
 
   return (
     <div>
@@ -172,6 +175,15 @@ export default function ModelMonitoring() {
             <label className="text-[10px] text-muted-foreground uppercase tracking-wider">Tamanho do Batch Simulado</label>
             <Input value={customBatchSize} onChange={e => setCustomBatchSize(e.target.value)} className="mt-1 bg-secondary/50 font-mono" placeholder="500" />
           </div>
+        </div>
+
+        <div className="mb-4">
+          <label className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center justify-between">
+            <span>Limiar de alerta de drift</span>
+            <span className="font-mono text-primary">{(driftThreshold * 100).toFixed(0)}%</span>
+          </label>
+          <input type="range" min={0.05} max={0.5} step={0.01} value={driftThreshold} onChange={(e) => setDriftThreshold(parseFloat(e.target.value))} className="w-full accent-primary mt-1" />
+          <p className="text-[10px] text-muted-foreground">Colunas com score de drift acima deste valor são marcadas como alteradas e disparam alerta.</p>
         </div>
 
         <div className="mb-4">
@@ -281,6 +293,15 @@ export default function ModelMonitoring() {
                 <p className="text-[10px] text-muted-foreground mt-0.5">{s.label}</p>
               </GlowCard>
             ))}
+          </div>
+
+          <div className={cn('rounded-lg border p-3 flex items-center gap-2.5', overThreshold ? 'border-destructive/40 bg-destructive/5' : 'border-emerald-400/30 bg-emerald-400/5')}>
+            {overThreshold ? <AlertTriangle className="w-4 h-4 text-destructive flex-shrink-0" /> : <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />}
+            <p className="text-xs text-muted-foreground">
+              {overThreshold
+                ? <>Drift geral <strong className="text-destructive">{(overallScore * 100).toFixed(1)}%</strong> acima do limiar de {(driftThreshold * 100).toFixed(0)}% — {driftedCols.length} coluna(s) alterada(s).</>
+                : <>Drift geral <strong className="text-emerald-400">{(overallScore * 100).toFixed(1)}%</strong> dentro do limiar de {(driftThreshold * 100).toFixed(0)}%. Modelo saudável.</>}
+            </p>
           </div>
 
           <div className="flex gap-1 bg-secondary/30 p-1 rounded-lg w-fit overflow-x-auto">

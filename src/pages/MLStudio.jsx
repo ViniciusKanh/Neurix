@@ -14,8 +14,9 @@ import ModelComparison from '@/components/ml/ModelComparison';
 import { Brain, Play, Loader2, GitCompare, Settings2, Trash2, Wrench, Pencil } from 'lucide-react';
 
 import { runClassification, runRegression, runClustering, runAnomalyDetection, runDimReduction, runFeatureSelection } from '@/lib/localML';
-import { runRealClassification, runRealRegression, runRealClustering } from '@/lib/realML';
+import { runRealClassification, runRealRegression, runRealClustering, crossValidate, permutationImportance, classBalance } from '@/lib/realML';
 import { getDataset, saveDataset, hasDataset } from '@/lib/datasetStore';
+import { AlertTriangle } from 'lucide-react';
 import { parseAnyFile } from '@/lib/parseDataset';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -159,6 +160,7 @@ export default function MLStudio() {
   const [selectedModel, setSelectedModel] = useState('all');
   const [customName, setCustomName] = useState('');
   const [localOk, setLocalOk] = useState(null); // null=unknown, true/false
+  const [balanceInfo, setBalanceInfo] = useState(null); // pre-run class balance (classification)
   const reloadRef = useRef();
   const queryClient = useQueryClient();
   void Wrench;
@@ -200,6 +202,22 @@ export default function MLStudio() {
     } finally { if (reloadRef.current) reloadRef.current.value = ''; }
   };
   const taskDef = TASK_TYPES.find(t => t.value === taskType);
+
+  // Pre-run class-balance check (classification) so the user sees imbalance before training.
+  useEffect(() => {
+    let alive = true;
+    setBalanceInfo(null);
+    if (taskType !== 'classification' || !targetColumn || !selectedProjectId || !localOk) return;
+    (async () => {
+      try {
+        const d = await getDataset(selectedProjectId);
+        if (!alive || !d?.rows?.length) return;
+        const b = classBalance(d.rows, targetColumn);
+        if (alive && !b.error) setBalanceInfo(b);
+      } catch { /* ignore */ }
+    })();
+    return () => { alive = false; };
+  }, [taskType, targetColumn, selectedProjectId, localOk]);
 
   const runAnalysis = async () => {
     if (!selectedProjectId || !taskType) return toast.error('Selecione o projeto e o tipo de análise');
@@ -267,6 +285,25 @@ export default function MLStudio() {
 
       if (!result || typeof result !== 'object') result = { interpretation: 'Análise concluída.', recommendations: [], metrics: {} };
       result.training_mode = realUsed ? 'real' : 'estimado';
+
+      // Reliability add-ons (real training, supervised tasks only).
+      if (realUsed && (taskType === 'classification' || taskType === 'regression')) {
+        const modelForCV = selectedModel && selectedModel !== 'all' ? selectedModel : (result.best_model || 'auto');
+        try {
+          if (cvStrategy && cvStrategy !== 'Sem CV') {
+            const k = /10/.test(cvStrategy) ? 10 : 5;
+            const cv = crossValidate(rows, targetColumn, cols, taskType, modelForCV, k);
+            if (!cv.error) result.cross_validation = cv;
+          }
+        } catch (e) { console.warn('[ML] CV falhou:', e.message); }
+        try {
+          const pi = permutationImportance(rows, targetColumn, cols, taskType, modelForCV);
+          if (!pi.error) result.permutation_importance = pi;
+        } catch (e) { console.warn('[ML] permutação falhou:', e.message); }
+        if (taskType === 'classification') {
+          try { const b = classBalance(rows, targetColumn); if (!b.error) result.class_balance = b; } catch { /* ignore */ }
+        }
+      }
 
       // Focus on a specific model when chosen (differs from "Todos os modelos").
       if (selectedModel && selectedModel !== 'all' && Array.isArray(result.models_comparison)) {
@@ -466,6 +503,20 @@ export default function MLStudio() {
                 </Button>
               </div>
             </div>
+
+            {/* Class-imbalance warning (pre-run) */}
+            {taskType === 'classification' && balanceInfo?.imbalanced && (
+              <div className="mt-4 rounded-lg border border-amber-400/40 bg-amber-400/5 p-3 flex items-start gap-2.5">
+                <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                <div className="text-xs">
+                  <p className="font-semibold text-amber-400">Classes desbalanceadas ({balanceInfo.severity})</p>
+                  <p className="text-muted-foreground mt-0.5">
+                    Distribuição: {balanceInfo.classes.map((c) => `${c.label} ${c.pct}%`).join(' · ')} — razão {balanceInfo.imbalance_ratio}×.
+                    Prefira <strong className="text-foreground">F1/Recall</strong> à acurácia e considere balancear as classes (menu de configurações avançadas).
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Advanced config */}
             {expandConfig && (

@@ -1,7 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
+import { getDataset } from '@/lib/datasetStore';
+import { correlationMatrix } from '@/lib/dataQuality';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import {
@@ -258,8 +260,8 @@ function ColumnCard({ col, stats, index }) {
   );
 }
 
-function CorrelationHeatmap({ corrData }) {
-  const { columns, matrix } = corrData;
+function CorrelationHeatmap({ corrData, real }) {
+  const { columns, matrix, high_pairs } = corrData;
   const getColor = (v) => {
     if (v >= 0.7) return 'bg-emerald-400 text-black';
     if (v >= 0.4) return 'bg-primary/70 text-black';
@@ -279,7 +281,31 @@ function CorrelationHeatmap({ corrData }) {
   }
 
   return (
-    <div className="overflow-x-auto">
+    <div>
+      {!real && (
+        <div className="mb-3 flex items-center gap-2 text-[11px] text-amber-400 bg-amber-400/5 border border-amber-400/20 rounded-lg p-2">
+          <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" /> Valores aproximados — recarregue o dataset no ML Studio para calcular a correlação real.
+        </div>
+      )}
+      {real && high_pairs?.length > 0 && (
+        <div className="mb-3 rounded-lg border border-amber-400/40 bg-amber-400/5 p-3">
+          <p className="text-[11px] font-semibold text-amber-400 flex items-center gap-1.5 mb-1">
+            <AlertTriangle className="w-3.5 h-3.5" /> Multicolinearidade detectada ({high_pairs.length} {high_pairs.length === 1 ? 'par' : 'pares'} com |r| ≥ {corrData.threshold})
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {high_pairs.slice(0, 8).map((p, i) => (
+              <span key={i} className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-secondary/60 text-foreground">
+                {p.a} ↔ {p.b}: {p.r.toFixed(2)}
+              </span>
+            ))}
+          </div>
+          <p className="text-[10px] text-muted-foreground mt-1.5">Variáveis muito correlacionadas são redundantes — considere remover uma de cada par antes de treinar modelos lineares.</p>
+        </div>
+      )}
+      {real && high_pairs?.length === 0 && (
+        <p className="mb-3 text-[11px] text-emerald-400">✓ Nenhum par com correlação alta (|r| ≥ {corrData.threshold}) — baixo risco de multicolinearidade.</p>
+      )}
+      <div className="overflow-x-auto">
       <table className="border-collapse text-[9px] font-mono">
         <thead>
           <tr>
@@ -318,6 +344,7 @@ function CorrelationHeatmap({ corrData }) {
             <span className={cn('w-3 h-3 rounded-sm inline-block', l.cls)} />{l.label}
           </span>
         ))}
+      </div>
       </div>
     </div>
   );
@@ -394,10 +421,27 @@ export default function DataProfiling() {
     return result;
   }, [project?.id]);
 
-  const corrData = useMemo(() => {
+  const [realCorr, setRealCorr] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    setRealCorr(null);
+    if (!project?.id) return;
+    (async () => {
+      try {
+        const d = await getDataset(project.id);
+        if (!alive || !d?.rows?.length) return;
+        const c = correlationMatrix(d.rows, project.column_info, 0.8);
+        if (alive && !c.error) setRealCorr(c);
+      } catch { /* ignore */ }
+    })();
+    return () => { alive = false; };
+  }, [project?.id]);
+
+  const fakeCorr = useMemo(() => {
     if (!project?.column_info) return { columns: [], matrix: [] };
     return generateCorrelationMatrix(project.column_info);
   }, [project?.id]);
+  const corrData = realCorr || fakeCorr;
 
   const totalOutliers = Object.values(colStats).reduce((s, c) => s + (c.outlier_count || 0), 0);
   const totalNulls = Object.values(colStats).reduce((s, c) => s + (c.null_count || 0), 0);
@@ -579,7 +623,7 @@ export default function DataProfiling() {
                   <p className="text-xs font-semibold text-muted-foreground mb-4 uppercase tracking-wider flex items-center gap-1.5">
                     <Grid3X3 className="w-3.5 h-3.5 text-primary" /> Matriz de Correlação de Pearson (colunas numéricas)
                   </p>
-                  <CorrelationHeatmap corrData={corrData} />
+                  <CorrelationHeatmap corrData={corrData} real={!!realCorr} />
                 </div>
               </motion.div>
             )}

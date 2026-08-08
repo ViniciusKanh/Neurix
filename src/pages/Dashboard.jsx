@@ -97,6 +97,33 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Guided start (no projects yet) */}
+      {projects.length === 0 && (
+        <GlowCard glowColor="accent">
+          <h3 className="font-semibold text-sm mb-1 flex items-center gap-2"><Sparkles className="w-4 h-4 text-accent" /> Comece em 3 passos</h3>
+          <p className="text-xs text-muted-foreground mb-4">Do dataset ao modelo avaliado — tudo local, sem enviar seus dados para servidores.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {[
+              { n: 1, icon: Database, title: 'Importe seu dataset', desc: 'Crie um projeto e envie um CSV/Excel. Os dados ficam no seu dispositivo.', to: '/projects/new', cta: 'Criar projeto' },
+              { n: 2, icon: Brain, title: 'Treine modelos', desc: 'No ML Studio, escolha a coluna-alvo e treine vários modelos de verdade.', to: '/ml-studio', cta: 'Abrir ML Studio' },
+              { n: 3, icon: FlaskConical, title: 'Avalie e simule', desc: 'Use o Laboratório do Modelo: ROC, threshold, importância e what-if.', to: '/model-lab', cta: 'Laboratório' },
+            ].map((s) => (
+              <Link key={s.n} to={s.to}>
+                <div className="group h-full rounded-xl border border-border/50 bg-card/50 p-4 hover:border-primary/50 hover:bg-primary/5 transition-all">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="w-6 h-6 rounded-full bg-primary/15 text-primary text-xs font-bold flex items-center justify-center">{s.n}</span>
+                    <s.icon className="w-4 h-4 text-primary" />
+                  </div>
+                  <p className="text-sm font-semibold text-foreground">{s.title}</p>
+                  <p className="text-[11px] text-muted-foreground mt-1 mb-3 leading-relaxed">{s.desc}</p>
+                  <span className="text-xs text-primary inline-flex items-center gap-1 group-hover:gap-1.5 transition-all">{s.cta} <ArrowRight className="w-3 h-3" /></span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </GlowCard>
+      )}
+
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {kpis.map((k, i) => (

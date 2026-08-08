@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
 import ModelLibrary from '@/components/docs/ModelLibrary';
 import ProjectDocView from '@/components/docs/ProjectDocView';
+import ModelCardView from '@/components/docs/ModelCardView';
 
 export default function ModelDocumentation() {
   const [activeView, setActiveView] = useState('library');
@@ -26,7 +27,7 @@ export default function ModelDocumentation() {
         subtitle="Biblioteca completa de algoritmos ML + documentação técnica exportável em PDF" />
 
       <div className="flex gap-1 bg-secondary/30 p-1 rounded-lg w-fit mb-5">
-        {[['library', '📚 Biblioteca de Modelos'], ['project', '📋 Documentar Projeto']].map(([v, l]) => (
+        {[['library', '📚 Biblioteca de Modelos'], ['project', '📋 Documentar Projeto'], ['card', '🪪 Model Card']].map(([v, l]) => (
           <button key={v} onClick={() => setActiveView(v)}
             className={cn('px-4 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap',
               activeView === v ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
@@ -37,6 +38,7 @@ export default function ModelDocumentation() {
 
       {activeView === 'library' && <ModelLibrary />}
       {activeView === 'project' && <ProjectDocView projects={projects} deployments={deployments} />}
+      {activeView === 'card' && <ModelCardView projects={projects} />}
     </div>
   );
 }

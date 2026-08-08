@@ -118,6 +118,80 @@ export default function AnalysisResult({ analysis }) {
             </div>
           )}
 
+          {/* Cross-validation (mean ± std) */}
+          {results.cross_validation && (
+            <div className="rounded-lg border border-accent/25 bg-accent/5 p-3">
+              <p className="text-xs font-semibold text-accent uppercase mb-2">
+                Validação Cruzada — {results.cross_validation.k}-fold
+              </p>
+              <div className="flex flex-wrap items-center gap-4 mb-2">
+                <div>
+                  <p className="text-[10px] text-muted-foreground">{results.cross_validation.metric}</p>
+                  <p className="text-lg font-bold font-mono text-foreground">
+                    {(results.cross_validation.mean * 100).toFixed(1)}%
+                    <span className="text-xs text-muted-foreground"> ± {(results.cross_validation.std * 100).toFixed(1)}</span>
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-muted-foreground">{results.cross_validation.secondary_metric}</p>
+                  <p className="text-sm font-mono text-muted-foreground">
+                    {results.cross_validation.secondary_mean.toFixed(3)} ± {results.cross_validation.secondary_std.toFixed(3)}
+                  </p>
+                </div>
+                <div className="flex gap-1 ml-auto">
+                  {results.cross_validation.folds.map((f) => (
+                    <span key={f.fold} title={`Fold ${f.fold}: ${(f.primary * 100).toFixed(1)}%`}
+                      className="w-6 h-6 rounded flex items-center justify-center text-[9px] font-mono bg-secondary/60 text-foreground/80">
+                      {(f.primary * 100).toFixed(0)}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                Desvio baixo = desempenho estável entre partições. Métrica mais confiável que um único holdout.
+              </p>
+            </div>
+          )}
+
+          {/* Permutation importance (global) */}
+          {results.permutation_importance?.importances?.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">
+                Importância por Permutação <span className="normal-case text-[10px]">(queda de {results.permutation_importance.metric} ao embaralhar cada variável)</span>
+              </p>
+              <div className="h-40 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={results.permutation_importance.importances.slice(0, 8)} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(222, 25%, 16%)" />
+                    <XAxis type="number" tick={{ fontSize: 10, fill: 'hsl(215, 20%, 55%)' }} />
+                    <YAxis dataKey="feature" type="category" width={120} tick={{ fontSize: 9, fill: 'hsl(215, 20%, 55%)' }} />
+                    <Tooltip contentStyle={{ background: 'hsl(222, 40%, 9%)', border: '1px solid hsl(222, 25%, 16%)', borderRadius: '8px', color: '#fff', fontSize: '11px' }} />
+                    <Bar dataKey="importance" fill="hsl(265, 70%, 62%)" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
+
+          {/* Class balance */}
+          {results.class_balance && !results.class_balance.error && (
+            <div className={`rounded-lg border p-3 ${results.class_balance.imbalanced ? 'border-amber-400/40 bg-amber-400/5' : 'border-border/40 bg-secondary/20'}`}>
+              <p className="text-xs font-semibold uppercase mb-2 text-muted-foreground">
+                Balanceamento de Classes {results.class_balance.imbalanced && <span className="text-amber-400">· desbalanceado ({results.class_balance.severity})</span>}
+              </p>
+              <div className="flex h-4 w-full rounded overflow-hidden mb-2">
+                {results.class_balance.classes.map((c, i) => (
+                  <div key={c.label} title={`${c.label}: ${c.pct}% (${c.count})`}
+                    style={{ width: `${c.pct}%`, background: ['hsl(187,92%,50%)', 'hsl(265,70%,62%)', 'hsl(152,68%,50%)', 'hsl(40,100%,55%)', 'hsl(330,90%,60%)'][i % 5] }} />
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+                {results.class_balance.classes.map((c) => <span key={c.label}><strong className="text-foreground">{c.label}</strong> {c.pct}%</span>)}
+                <span className="ml-auto">razão {results.class_balance.imbalance_ratio}×</span>
+              </div>
+            </div>
+          )}
+
           {/* Interpretation (computed) */}
           {analysis.ai_interpretation && (
             <div className="p-4 rounded-lg bg-accent/5 border border-accent/20">

@@ -707,3 +707,110 @@ function pickModels(candidates, selectedModel) {
   if (wanted && candidates[wanted]) return { [wanted]: candidates[wanted] };
   return candidates;
 }
+
+// ---------- reliability: cross-validation, permutation importance, class balance ----------
+
+// Macro-F1 + accuracy from encoded labels.
+function scoreClass(yTrue, yPred, K) {
+  const cm = Array.from({ length: K }, () => Array(K).fill(0));
+  for (let i = 0; i < yTrue.length; i++) cm[yTrue[i]][yPred[i]]++;
+  let correct = 0; for (let k = 0; k < K; k++) correct += cm[k][k];
+  let fSum = 0, valid = 0;
+  for (let k = 0; k < K; k++) {
+    const tp = cm[k][k];
+    const fp = cm.reduce((s, row, i) => s + (i !== k ? row[k] : 0), 0);
+    const fn = cm[k].reduce((s, v, i) => s + (i !== k ? v : 0), 0);
+    const prec = tp + fp ? tp / (tp + fp) : 0, rec = tp + fn ? tp / (tp + fn) : 0;
+    if (cm[k].reduce((a, b) => a + b, 0) > 0) { fSum += prec + rec ? 2 * prec * rec / (prec + rec) : 0; valid++; }
+  }
+  return { accuracy: correct / yTrue.length, f1: fSum / (valid || 1) };
+}
+function r2of(yTrue, yPred) {
+  const m = mean(yTrue), ssTot = yTrue.reduce((s, v) => s + (v - m) ** 2, 0) || 1;
+  const ssRes = yTrue.reduce((s, v, i) => s + (v - yPred[i]) ** 2, 0);
+  return 1 - ssRes / ssTot;
+}
+const stdOf = (a) => { const m = mean(a); return Math.sqrt(mean(a.map((v) => (v - m) ** 2))); };
+
+// Stratified-ish k-fold cross-validation with mean ± std of the key metric.
+export function crossValidate(rows, targetColumn, columnInfo, task, modelName, k = 5) {
+  const ds = buildDataset(rows, targetColumn, columnInfo, task);
+  if (ds.X.length < 30) return { error: true, message: 'Validação cruzada requer ≥ 30 linhas.' };
+  const K = ds.classes ? ds.classes.length : 0;
+  if (task === 'classification' && K < 2) return { error: true, message: 'A coluna-alvo precisa de ≥ 2 classes.' };
+  const rand = seededRand(20240808);
+  const idx = shuffleIdx(ds.X.length, rand);
+  const folds = Array.from({ length: k }, () => []);
+  idx.forEach((v, i) => folds[i % k].push(v));
+
+  const primary = [], secondary = [];
+  for (let f = 0; f < k; f++) {
+    const testI = new Set(folds[f]);
+    const Xtr = [], ytr = [], Xte = [], yte = [];
+    for (let i = 0; i < ds.X.length; i++) (testI.has(i) ? (Xte.push(ds.X[i]), yte.push(ds.y[i])) : (Xtr.push(ds.X[i]), ytr.push(ds.y[i])));
+    if (Xtr.length < 5 || !Xte.length) continue;
+    const model = fitByName(Xtr, ytr, task, modelName, K);
+    const pred = Xte.map((x) => model.predict(x));
+    if (task === 'classification') { const s = scoreClass(yte, pred, K); primary.push(s.f1); secondary.push(s.accuracy); }
+    else { primary.push(r2of(yte, pred)); secondary.push(Math.sqrt(mean(yte.map((v, i) => (v - pred[i]) ** 2)))); }
+  }
+  return {
+    task, k: primary.length, model: normalizeModelName(modelName, task),
+    metric: task === 'classification' ? 'F1 (macro)' : 'R²',
+    secondary_metric: task === 'classification' ? 'Acurácia' : 'RMSE',
+    folds: primary.map((v, i) => ({ fold: i + 1, primary: r4(v), secondary: r4(secondary[i]) })),
+    mean: r4(mean(primary)), std: r4(stdOf(primary)),
+    secondary_mean: r4(mean(secondary)), secondary_std: r4(stdOf(secondary)),
+    trained_on: ds.X.length,
+  };
+}
+
+// Permutation importance at the ORIGINAL-feature level (groups one-hot columns).
+export function permutationImportance(rows, targetColumn, columnInfo, task, modelName, repeats = 3) {
+  const ds = buildDataset(rows, targetColumn, columnInfo, task);
+  if (ds.X.length < 30) return { error: true, message: 'Importância por permutação requer ≥ 30 linhas.' };
+  const K = ds.classes ? ds.classes.length : 0;
+  const rand = seededRand(13131);
+  const { Xtr, ytr, Xte, yte } = split(ds.X, ds.y, 0.3, rand);
+  const model = fitByName(Xtr, ytr, task, modelName, K);
+  const score = (X) => { const p = X.map((x) => model.predict(x)); return task === 'classification' ? scoreClass(yte, p, K).accuracy : r2of(yte, p); };
+  const baseline = score(Xte);
+
+  // map each original feature to its encoded column indices
+  const groups = []; let off = 0;
+  ds.featCols.forEach((c) => {
+    const width = isNumericType(c.type) ? 1 : (ds.encoders[c.name] || []).length;
+    if (width > 0) groups.push({ name: c.name, cols: Array.from({ length: width }, (_, i) => off + i) });
+    off += width;
+  });
+
+  const out = groups.map((g) => {
+    let drop = 0;
+    for (let rep = 0; rep < repeats; rep++) {
+      const perm = shuffleIdx(Xte.length, rand);
+      const Xp = Xte.map((row, i) => { const r = row.slice(); g.cols.forEach((cj) => { r[cj] = Xte[perm[i]][cj]; }); return r; });
+      drop += baseline - score(Xp);
+    }
+    return { feature: g.name, importance: r4(drop / repeats) };
+  }).sort((a, b) => b.importance - a.importance);
+
+  return { task, baseline: r4(baseline), metric: task === 'classification' ? 'Acurácia' : 'R²', importances: out, trained_on: ds.X.length };
+}
+
+// Class distribution + imbalance diagnostics (classification only).
+export function classBalance(rows, targetColumn) {
+  const counts = {};
+  rows.forEach((r) => { const v = r[targetColumn]; if (v !== undefined && v !== null && v !== '') { const s = String(v); counts[s] = (counts[s] || 0) + 1; } });
+  const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  const total = entries.reduce((s, [, c]) => s + c, 0) || 1;
+  if (!entries.length) return { error: true, message: 'Coluna-alvo sem valores.' };
+  const classes = entries.map(([label, count]) => ({ label, count, pct: Number(((count / total) * 100).toFixed(1)) }));
+  const maxC = entries[0][1], minC = entries[entries.length - 1][1];
+  const ratio = minC ? Number((maxC / minC).toFixed(2)) : Infinity;
+  const minorityPct = Number(((minC / total) * 100).toFixed(1));
+  return {
+    total, classes, imbalance_ratio: ratio, minority_pct: minorityPct,
+    imbalanced: ratio >= 3 || minorityPct < 15,
+    severity: ratio >= 10 || minorityPct < 5 ? 'alto' : ratio >= 3 || minorityPct < 15 ? 'moderado' : 'ok',
+  };
+}
