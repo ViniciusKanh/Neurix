@@ -7,7 +7,8 @@ import {
   Rocket, Swords, TrendingUp,
   Download, FlaskConical, Settings2, PackageSearch,
   ChevronDown, GitCompare, History, Wand2,
-  Settings, UsersRound, LogOut
+  Settings, UsersRound, LogOut,
+  SlidersHorizontal, Layers as LayersIcon
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -36,6 +37,7 @@ const NAV_GROUPS = [
     label: 'Modelagem',
     items: [
       { icon: Brain, label: 'ML Studio', path: '/ml-studio' },
+      { icon: SlidersHorizontal, label: 'Laboratório do Modelo', path: '/model-lab' },
       { icon: FlaskConical, label: 'Testes ML Avançados', path: '/advanced-ml' },
       { icon: Zap, label: 'AutoML Pipeline', path: '/automl' },
       { icon: GitBranch, label: 'Comparação de Modelos', path: '/model-comparison' },
@@ -48,6 +50,7 @@ const NAV_GROUPS = [
     label: 'MLOps',
     items: [
       { icon: Wand2, label: 'Inferência & Retreino', path: '/inference' },
+      { icon: LayersIcon, label: 'Scoring em Lote', path: '/batch-score' },
       { icon: Rocket, label: 'Deploy', path: '/deploy' },
       { icon: Activity, label: 'Monitoramento', path: '/monitoring' },
       { icon: History, label: 'Histórico de Runs', path: '/pipeline-history' },

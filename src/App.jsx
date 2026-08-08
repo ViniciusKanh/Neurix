@@ -37,6 +37,8 @@ import AdvancedMLTests from './pages/AdvancedMLTests';
 import DataProfiling from './pages/DataProfiling';
 import PipelineExecutionHistory from './pages/PipelineExecutionHistory';
 import Deploy from './pages/Deploy';
+import ModelLab from './pages/ModelLab';
+import BatchScore from './pages/BatchScore';
 import Login from './pages/Login';
 import Settings from './pages/Settings';
 import UserManagement from './pages/UserManagement';
@@ -75,6 +77,8 @@ const AuthenticatedApp = () => {
         <Route path="/projects/:id" element={<ProjectView />} />
         <Route path="/explorer" element={<DataExplorer />} />
         <Route path="/ml-studio" element={<MLStudio />} />
+        <Route path="/model-lab" element={<ModelLab />} />
+        <Route path="/batch-score" element={<BatchScore />} />
 
         <Route path="/visualization-3d" element={<Visualization3D />} />
         <Route path="/reports" element={<Reports />} />

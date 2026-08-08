@@ -5,6 +5,7 @@ import AnimatedBackground from './AnimatedBackground';
 import MobileBottomNav from './MobileBottomNav';
 import UserMenu from './UserMenu';
 import Onboarding, { shouldShowOnboarding } from '@/components/Onboarding';
+import CommandPalette from '@/components/CommandPalette';
 import { cn } from '@/lib/utils';
 
 export default function AppLayout() {
@@ -17,6 +18,7 @@ export default function AppLayout() {
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
       {onboarding && <Onboarding onClose={() => setOnboarding(false)} />}
+      <CommandPalette />
       {/* Tactical background */}
       <AnimatedBackground />
 
@@ -60,6 +62,14 @@ export default function AppLayout() {
             <span className="text-[9px] font-mono text-muted-foreground uppercase tracking-widest">NEURIX · ML Workbench</span>
           </div>
           <div className="flex items-center gap-4">
+            <button
+              onClick={() => window.dispatchEvent(new Event('neurix:open-palette'))}
+              className="flex items-center gap-2 px-2 py-1 rounded-md border border-border/60 bg-secondary/40 hover:border-primary/40 hover:text-primary text-muted-foreground transition-colors"
+              title="Busca rápida de telas"
+            >
+              <span className="text-[9px] font-mono">Buscar</span>
+              <kbd className="text-[8px] font-mono border border-border rounded px-1 py-0.5">⌘K</kbd>
+            </button>
             <div className="flex items-center gap-1.5">
               <span className="text-[9px] font-mono text-muted-foreground">STATUS:</span>
               <span className="text-[9px] font-mono text-accent font-bold">ONLINE</span>

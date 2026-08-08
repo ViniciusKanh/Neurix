@@ -27,11 +27,13 @@ export function buildDataset(rows, targetColumn, columnInfo, task) {
   const cols = columnInfo || [];
   const hasTarget = cols.some((c) => c.name === targetColumn);
   const nRows = rows.length || 1;
-  // Drop identifier-like columns (nearly unique numeric, or names ending in id).
+  // Drop identifier columns by NAME (not by cardinality — continuous features
+  // like income/amount are also nearly unique and must be kept).
   const isIdLike = (c) => {
-    const nm = (c.name || '').toLowerCase();
-    const nearlyUnique = (c.unique_count || 0) >= 0.9 * nRows && (c.unique_count || 0) > 50;
-    return (isNumericType(c.type) && nearlyUnique) || /(^id$|_id$|id$|codigo|código)$/i.test(nm) && nearlyUnique;
+    const nm = (c.name || '').toLowerCase().trim();
+    const idName = nm === 'id' || /_id$/.test(nm) || (/id$/.test(nm) && nm.length <= 16)
+      || /(codigo|código|cpf|cnpj|uuid|guid|matric)/.test(nm);
+    return idName && (c.unique_count || 0) >= 0.5 * nRows;
   };
   let featCols = (hasTarget ? cols.filter((c) => c.name !== targetColumn) : cols).filter((c) => !isIdLike(c));
   if (featCols.length === 0) featCols = hasTarget ? cols.filter((c) => c.name !== targetColumn) : cols;
@@ -259,6 +261,100 @@ export function trainPredictor(rows, targetColumn, columnInfo, task, modelName =
       return { value: Number(out.toFixed(4)) };
     },
   };
+}
+
+// Fits the chosen model on already-encoded X/y (used by makeModel + evaluate).
+function fitByName(X, y, task, modelName, K) {
+  const pick = normalizeModelName(modelName, task);
+  const rf = seededRand(999);
+  if (task === 'classification') {
+    return pick === 'tree' ? fitTreeModel(X, y, 'classification')
+      : pick === 'rf' ? fitRandomForest(X, y, 'classification', rf)
+      : pick === 'gb' ? fitGBClass(X, y, K)
+      : pick === 'svm' ? fitSVM(X, y, K)
+      : pick === 'knn' ? fitKNNModel(X, y, 'classification')
+      : pick === 'nb' ? fitNBModel(X, y, K)
+      : fitSoftmax(X, y, K);
+  }
+  return pick === 'tree' ? fitTreeModel(X, y, 'regression')
+    : pick === 'rf' ? fitRandomForest(X, y, 'regression', rf)
+    : pick === 'gb' ? fitGBReg(X, y)
+    : pick === 'ridge' ? fitRidge(X, y)
+    : pick === 'lasso' ? fitLasso(X, y)
+    : pick === 'knn' ? fitKNNModel(X, y, 'regression')
+    : fitLinear(X, y);
+}
+
+// Softmax that also returns class probabilities (for XAI + ROC/PR curves).
+function softmaxProbaModel(X, y, K, epochs = 250, lr = 0.3) {
+  const n = X.length, d = X[0].length;
+  const W = Array.from({ length: K }, () => Array(d + 1).fill(0));
+  const feat = (x) => [1, ...x];
+  for (let ep = 0; ep < epochs; ep++) {
+    const grad = Array.from({ length: K }, () => Array(d + 1).fill(0));
+    for (let i = 0; i < n; i++) {
+      const xf = feat(X[i]);
+      const sc = W.map((w) => w.reduce((s, wj, j) => s + wj * xf[j], 0));
+      const mx = Math.max(...sc); const ex = sc.map((s) => Math.exp(s - mx)); const sum = ex.reduce((a, b) => a + b, 0);
+      for (let k = 0; k < K; k++) { const p = ex[k] / sum - (y[i] === k ? 1 : 0); for (let j = 0; j <= d; j++) grad[k][j] += p * xf[j]; }
+    }
+    for (let k = 0; k < K; k++) for (let j = 0; j <= d; j++) W[k][j] -= (lr / n) * grad[k][j];
+  }
+  return {
+    proba(xs) { const xf = [1, ...xs]; const sc = W.map((w) => w.reduce((s, wj, j) => s + wj * xf[j], 0)); const mx = Math.max(...sc); const ex = sc.map((s) => Math.exp(s - mx)); const sum = ex.reduce((a, b) => a + b, 0); return ex.map((e) => e / sum); },
+  };
+}
+
+// Reusable model bundle: hard predict (chosen model) + probability (logistic)
+// + feature spec for building the What-if simulator UI. Used by the Model Lab.
+export function makeModel(rows, targetColumn, columnInfo, task, modelName = 'auto') {
+  const ds = buildDataset(rows, targetColumn, columnInfo, task);
+  if (ds.X.length < 10) return null;
+  const K = ds.classes ? ds.classes.length : 0;
+  if (task === 'classification' && K < 2) return null;
+  const meta = { featCols: ds.featCols, encoders: ds.encoders, means: ds.means, stds: ds.stds };
+  const hard = fitByName(ds.X, ds.y, task, modelName, K);
+  const pm = task === 'classification' ? softmaxProbaModel(ds.X, ds.y, K) : null;
+  const spec = ds.featCols.map((c) => {
+    if (isNumericType(c.type)) {
+      const vals = rows.map((r) => parseFloat(r[c.name])).filter((v) => !isNaN(v));
+      const mn = Math.min(...vals), mx = Math.max(...vals), me = mean(vals);
+      return { name: c.name, numeric: true, min: Number(mn.toFixed(3)), max: Number(mx.toFixed(3)), mean: Number(me.toFixed(3)) };
+    }
+    const opts = ds.encoders[c.name] || [];
+    return { name: c.name, numeric: false, options: opts, mean: opts[0] ?? '' };
+  });
+  const enc = (row) => encodeRow(row, meta);
+  return {
+    task, classes: ds.classes, features: spec, model_name: normalizeModelName(modelName, task), trained_on: ds.X.length,
+    predict(row) { const out = hard.predict(enc(row)); return task === 'classification' ? { value: ds.classes[out] ?? String(out), index: out } : { value: Number(out.toFixed(4)) }; },
+    proba(row) { return pm ? pm.proba(enc(row)) : null; },     // vector of class probs (classification)
+    scalar(row) { const out = hard.predict(enc(row)); return task === 'classification' ? (pm ? pm.proba(enc(row))[K - 1] : out) : out; }, // scalar score for XAI
+  };
+}
+
+// Holdout evaluation: confusion matrix + (binary) probability points for ROC/PR.
+export function evaluateModel(rows, targetColumn, columnInfo, task, modelName, splitRatio = 0.25) {
+  const ds = buildDataset(rows, targetColumn, columnInfo, task);
+  if (ds.X.length < 20) return { error: true, message: 'Dados insuficientes (mín. 20 linhas).' };
+  const rand = seededRand(2024);
+  const { Xtr, ytr, Xte, yte } = split(ds.X, ds.y, splitRatio, rand);
+  if (task === 'classification') {
+    const K = ds.classes.length;
+    const model = fitByName(Xtr, ytr, 'classification', modelName, K);
+    const pred = Xte.map((x) => model.predict(x));
+    const cm = Array.from({ length: K }, () => Array(K).fill(0));
+    for (let i = 0; i < yte.length; i++) cm[yte[i]][pred[i]]++;
+    let points = null;
+    if (K === 2) { const pm = softmaxProbaModel(Xtr, ytr, 2); points = Xte.map((x, i) => ({ y: yte[i], score: pm.proba(x)[1] })); }
+    return { task, classes: ds.classes, confusion: cm, points, test_size: yte.length, positive_class: ds.classes[K - 1] };
+  }
+  // regression: predicted vs actual for a scatter
+  const model = fitByName(Xtr, ytr, 'regression', modelName, 0);
+  const pred = Xte.map((x) => model.predict(x));
+  const pts = yte.map((v, i) => ({ actual: v, predicted: Number(pred[i].toFixed(3)) }));
+  const m = mean(yte); const ssTot = yte.reduce((s, v) => s + (v - m) ** 2, 0) || 1; const ssRes = yte.reduce((s, v, i) => s + (v - pred[i]) ** 2, 0);
+  return { task, r2: Number((1 - ssRes / ssTot).toFixed(4)), points: pts, test_size: yte.length };
 }
 
 function split(X, y, ratio, rand) {
