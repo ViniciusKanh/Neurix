@@ -5,10 +5,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import GlowCard from '@/components/ui/GlowCard';
 import EmptyState from '@/components/ui/EmptyState';
-import { IdCard, Download, Loader2, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { IdCard, Download, Loader2, ShieldCheck, AlertTriangle, Code2 } from 'lucide-react';
 import { getDataset } from '@/lib/datasetStore';
 import { crossValidate, classBalance } from '@/lib/realML';
-import { buildModelCard, buildModelBundle, downloadJSON } from '@/lib/governance';
+import { buildModelCard, buildModelBundle, downloadJSON, exportSklearn, downloadText } from '@/lib/governance';
 import { toast } from 'sonner';
 
 export default function ModelCardView({ projects = [] }) {
@@ -55,6 +55,12 @@ export default function ModelCardView({ projects = [] }) {
     toast.success('Model Card exportado em JSON.');
   };
 
+  const exportPython = () => {
+    if (!analysis) return;
+    downloadText(exportSklearn(project, analysis), `pipeline-${(project?.name || 'modelo').replace(/\s+/g, '_')}.py`, 'text/x-python');
+    toast.success('Script Python (pandas + scikit-learn) exportado.');
+  };
+
   return (
     <div className="space-y-4">
       <GlowCard>
@@ -87,7 +93,10 @@ export default function ModelCardView({ projects = [] }) {
               <h3 className="font-semibold text-foreground flex items-center gap-2"><IdCard className="w-4 h-4 text-primary" /> {card.model_name}</h3>
               <p className="text-xs text-muted-foreground">{card.task} · alvo <span className="font-mono text-foreground">{card.target}</span> · projeto {card.project}</p>
             </div>
-            <Button size="sm" onClick={exportJSON} className="bg-primary text-primary-foreground hover:bg-primary/90"><Download className="w-3.5 h-3.5 mr-1.5" /> Exportar JSON</Button>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={exportPython} className="border-primary/40 text-primary hover:bg-primary/10"><Code2 className="w-3.5 h-3.5 mr-1.5" /> Python</Button>
+              <Button size="sm" onClick={exportJSON} className="bg-primary text-primary-foreground hover:bg-primary/90"><Download className="w-3.5 h-3.5 mr-1.5" /> JSON</Button>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">

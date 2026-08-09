@@ -7,10 +7,10 @@ import { Button } from '@/components/ui/button';
 import PageHeader from '@/components/ui/PageHeader';
 import GlowCard from '@/components/ui/GlowCard';
 import EmptyState from '@/components/ui/EmptyState';
-import { FlaskConical, Loader2, SlidersHorizontal, BarChart3, Grid3x3, Lightbulb, Play, Target } from 'lucide-react';
+import { FlaskConical, Loader2, SlidersHorizontal, BarChart3, Grid3x3, Lightbulb, Play, Target, Activity, Scale } from 'lucide-react';
 import { toast } from 'sonner';
 import { getDataset } from '@/lib/datasetStore';
-import { makeModel, evaluateModel } from '@/lib/realML';
+import { makeModel, evaluateModel, partialDependence, fairnessMetrics } from '@/lib/realML';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine,
   BarChart, Bar, Cell, ScatterChart, Scatter,
@@ -21,6 +21,8 @@ const TABS = [
   { id: 'sim', label: 'Simulador', icon: SlidersHorizontal },
   { id: 'xai', label: 'Explicação (XAI)', icon: Lightbulb },
   { id: 'eval', label: 'Avaliação', icon: BarChart3 },
+  { id: 'pdp', label: 'Dependência (PDP/ICE)', icon: Activity },
+  { id: 'fairness', label: 'Fairness', icon: Scale },
   { id: 'boundary', label: 'Fronteira 2D', icon: Grid3x3 },
 ];
 
@@ -112,6 +114,8 @@ export default function ModelLab() {
           {tab === 'sim' && <Simulator model={model} inputs={inputs} setInputs={setInputs} />}
           {tab === 'xai' && <Explain model={model} inputs={inputs} />}
           {tab === 'eval' && <Evaluation ev={evalRes} model={model} />}
+          {tab === 'pdp' && <PDPTab model={model} rows={rows} />}
+          {tab === 'fairness' && <FairnessTab model={model} rows={rows} targetCol={targetCol} project={project} />}
           {tab === 'boundary' && <Boundary model={model} rows={rows} targetCol={targetCol} />}
         </>
       )}
@@ -312,6 +316,90 @@ function Evaluation({ ev, model }) {
           </div>
         </GlowCard>
       )}
+    </div>
+  );
+}
+
+/* ── Partial Dependence + ICE ── */
+function PDPTab({ model, rows }) {
+  const feats = model.features;
+  const [feat, setFeat] = useState(feats[0]?.name);
+  const pd = useMemo(() => partialDependence(model, rows, feat, { grid: 20, ice: 10, sample: 300 }), [model, feat, rows]);
+  if (pd.error) return <EmptyState icon={Activity} title="PDP indisponível" description={pd.message} />;
+
+  // merge pdp + ice into one dataset keyed by x for the line chart
+  const data = pd.pdp.map((p, i) => { const row = { x: p.x, pdp: p.y }; pd.ice.forEach((line, li) => { row[`ice${li}`] = line[i]?.y; }); return row; });
+
+  return (
+    <GlowCard>
+      <div className="flex flex-wrap items-center gap-3 mb-4">
+        <h3 className="font-semibold text-sm flex items-center gap-2"><Activity className="w-4 h-4 text-primary" /> Dependência Parcial</h3>
+        <Select value={feat} onValueChange={setFeat}>
+          <SelectTrigger className="bg-secondary/50 h-8 text-xs w-48 ml-auto"><SelectValue /></SelectTrigger>
+          <SelectContent>{feats.map((f) => <SelectItem key={f.name} value={f.name}>{f.name}</SelectItem>)}</SelectContent>
+        </Select>
+      </div>
+      <p className="text-xs text-muted-foreground mb-3">Linha grossa = efeito médio de <strong className="text-foreground">{pd.feature}</strong> sobre <strong className="text-foreground">{pd.score_label}</strong> (PDP). Linhas finas = casos individuais (ICE).</p>
+      <div className="h-80">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={data} margin={{ left: -10, right: 10 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(210,30%,14%)" />
+            <XAxis dataKey="x" type={pd.numeric ? 'number' : 'category'} domain={pd.numeric ? ['auto', 'auto'] : undefined} tick={{ fontSize: 9, fill: 'hsl(210,20%,55%)' }} />
+            <YAxis tick={{ fontSize: 9, fill: 'hsl(210,20%,55%)' }} />
+            <Tooltip contentStyle={TT} />
+            {pd.ice.map((_, li) => <Line key={li} dataKey={`ice${li}`} stroke="hsl(210,30%,45%)" strokeWidth={1} dot={false} opacity={0.35} isAnimationActive={false} />)}
+            <Line dataKey="pdp" stroke="hsl(var(--primary))" strokeWidth={3} dot={false} name="PDP" isAnimationActive={false} />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </GlowCard>
+  );
+}
+
+/* ── Auditoria de Fairness ── */
+function FairnessTab({ model, rows, targetCol, project }) {
+  const candidates = (project?.column_info || []).filter((c) => c.name !== targetCol && (!['number', 'float', 'int', 'integer', 'numeric', 'float64', 'int64', 'double'].includes((c.type || '').toLowerCase()) || (c.unique_count || 99) <= 8)).map((c) => c.name);
+  const [sens, setSens] = useState(candidates[0] || '');
+  if (model.task !== 'classification') return <EmptyState icon={Scale} title="Fairness" description="Auditoria disponível apenas para modelos de classificação." />;
+  if (!candidates.length) return <EmptyState icon={Scale} title="Fairness" description="Nenhuma coluna sensível adequada (categórica ou de baixa cardinalidade) no dataset." />;
+  const fair = fairnessMetrics(model, rows, targetCol, sens);
+
+  return (
+    <div className="space-y-4">
+      <GlowCard>
+        <div className="flex flex-wrap items-center gap-3 mb-1">
+          <h3 className="font-semibold text-sm flex items-center gap-2"><Scale className="w-4 h-4 text-primary" /> Auditoria de Fairness</h3>
+          <Select value={sens} onValueChange={setSens}>
+            <SelectTrigger className="bg-secondary/50 h-8 text-xs w-48 ml-auto"><SelectValue /></SelectTrigger>
+            <SelectContent>{candidates.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+          </Select>
+        </div>
+        {fair.error ? <p className="text-sm text-muted-foreground py-6 text-center">{fair.message}</p> : (
+          <>
+            <p className="text-xs text-muted-foreground mb-3">Métricas por grupo de <strong className="text-foreground">{sens}</strong> (classe positiva: {fair.positive_class}).</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+              <div className="rounded-lg bg-secondary/40 p-3 text-center"><p className={`text-lg font-bold font-mono ${fair.accuracy_gap <= 0.1 ? 'text-accent' : 'text-amber-400'}`}>{(fair.accuracy_gap * 100).toFixed(1)}%</p><p className="text-[10px] text-muted-foreground">Diferença de acurácia</p></div>
+              <div className="rounded-lg bg-secondary/40 p-3 text-center"><p className={`text-lg font-bold font-mono ${fair.disparate_impact >= 0.8 ? 'text-accent' : 'text-destructive'}`}>{fair.disparate_impact.toFixed(2)}</p><p className="text-[10px] text-muted-foreground">Impacto desigual (regra 80%)</p></div>
+              <div className="rounded-lg bg-secondary/40 p-3 text-center"><p className={`text-lg font-bold font-mono ${fair.fair ? 'text-accent' : 'text-amber-400'}`}>{fair.fair ? 'OK' : 'Atenção'}</p><p className="text-[10px] text-muted-foreground">Veredito</p></div>
+            </div>
+            <div className="h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={fair.groups.map((g) => ({ grupo: String(g.group).slice(0, 16), Acuracia: Number((g.accuracy * 100).toFixed(1)), 'Taxa seleção': Number((g.selection_rate * 100).toFixed(1)) }))}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(210,30%,14%)" />
+                  <XAxis dataKey="grupo" tick={{ fontSize: 9, fill: 'hsl(210,20%,55%)' }} />
+                  <YAxis tick={{ fontSize: 9, fill: 'hsl(210,20%,55%)' }} unit="%" />
+                  <Tooltip contentStyle={TT} />
+                  <Bar dataKey="Acuracia" fill="hsl(187,92%,50%)" radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="Taxa seleção" fill="hsl(265,70%,62%)" radius={[3, 3, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-2">
+              {fair.fair ? '✓ Sem disparidades relevantes entre grupos.' : '⚠ Há disparidade entre grupos — impacto desigual < 0,8 (regra dos 80%) ou diferença de acurácia > 10%. Avalie rebalanceamento ou revisão de features.'} Avaliado sobre o dataset local.
+            </p>
+          </>
+        )}
+      </GlowCard>
     </div>
   );
 }

@@ -21,6 +21,7 @@ const DataExplorer = lazy(() => import('./pages/DataExplorer'));
 const MLStudio = lazy(() => import('./pages/MLStudio'));
 const SQLWorkbench = lazy(() => import('./pages/SQLWorkbench'));
 const StatisticsLab = lazy(() => import('./pages/StatisticsLab'));
+const FeatureLab = lazy(() => import('./pages/FeatureLab'));
 const Visualization3D = lazy(() => import('./pages/Visualization3D'));
 const Reports = lazy(() => import('./pages/Reports'));
 const AssociationRules = lazy(() => import('./pages/AssociationRules'));
@@ -86,6 +87,7 @@ const AuthenticatedApp = () => {
         <Route path="/explorer" element={<DataExplorer />} />
         <Route path="/sql" element={<SQLWorkbench />} />
         <Route path="/statistics" element={<StatisticsLab />} />
+        <Route path="/feature-lab" element={<FeatureLab />} />
         <Route path="/ml-studio" element={<MLStudio />} />
         <Route path="/model-lab" element={<ModelLab />} />
         <Route path="/batch-score" element={<BatchScore />} />

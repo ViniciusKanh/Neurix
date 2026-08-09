@@ -32,6 +32,7 @@ const NAV_GROUPS = [
       { icon: BarChart2, label: 'Perfilamento de Dados', path: '/data-profiling' },
       { icon: TerminalSquare, label: 'Workbench SQL', path: '/sql' },
       { icon: Sigma, label: 'Laboratório Estatístico', path: '/statistics' },
+      { icon: Wand2, label: 'Feature Engineering', path: '/feature-lab' },
       { icon: Download, label: 'Exportar Dataset', path: '/dataset-export' },
     ],
   },

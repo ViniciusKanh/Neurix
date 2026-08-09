@@ -357,6 +357,80 @@ export function evaluateModel(rows, targetColumn, columnInfo, task, modelName, s
   return { task, r2: Number((1 - ssRes / ssTot).toFixed(4)), points: pts, test_size: yte.length };
 }
 
+// Partial Dependence (PDP) + Individual Conditional Expectation (ICE) for a
+// feature, using a fitted model bundle (from makeModel). Averages the model's
+// scalar score across the dataset while sweeping one feature.
+export function partialDependence(model, rows, featureName, opts = {}) {
+  if (!model) return { error: true, message: 'Modelo indisponível.' };
+  const spec = model.features.find((f) => f.name === featureName);
+  if (!spec) return { error: true, message: 'Feature não encontrada.' };
+  const grid = opts.grid || 20;
+  const sampleN = Math.min(rows.length, opts.sample || 300);
+  const rand = seededRand(2025);
+  const idx = shuffleIdx(rows.length, rand).slice(0, sampleN);
+  const sample = idx.map((i) => rows[i]);
+  const iceN = Math.min(opts.ice || 12, sample.length);
+
+  const xs = spec.numeric
+    ? Array.from({ length: grid }, (_, i) => Number((spec.min + (spec.max - spec.min) * (i / (grid - 1))).toFixed(4)))
+    : (spec.options || []);
+
+  const pdp = []; const ice = Array.from({ length: iceN }, () => []);
+  xs.forEach((xv) => {
+    let sum = 0;
+    for (let s = 0; s < sample.length; s++) {
+      const row = { ...sample[s], [featureName]: xv };
+      const val = model.scalar(row);
+      sum += val;
+      if (s < iceN) ice[s].push({ x: xv, y: Number(val.toFixed(4)) });
+    }
+    pdp.push({ x: xv, y: Number((sum / sample.length).toFixed(4)) });
+  });
+  return {
+    feature: featureName, numeric: spec.numeric, task: model.task,
+    score_label: model.task === 'classification' ? `P(${model.classes[model.classes.length - 1]})` : 'Predição',
+    pdp, ice, trained_on: rows.length,
+  };
+}
+
+// Fairness audit: per-group accuracy + selection rate (+ TPR for binary),
+// with disparity metrics (accuracy gap, disparate impact / 80% rule).
+export function fairnessMetrics(model, rows, targetColumn, sensitiveColumn, opts = {}) {
+  if (!model || model.task !== 'classification') return { error: true, message: 'Disponível apenas para classificação.' };
+  const positive = model.classes[model.classes.length - 1];
+  const groupsMap = {};
+  const cap = Math.min(rows.length, opts.max || 5000);
+  for (let i = 0; i < cap; i++) {
+    const r = rows[i]; const g = String(r[sensitiveColumn] ?? '');
+    const tv = r[targetColumn];
+    if (g === '' || tv === undefined || tv === null || tv === '') continue;
+    const pred = model.predict(r).value;
+    const actual = String(r[targetColumn]);
+    (groupsMap[g] = groupsMap[g] || { n: 0, correct: 0, predPos: 0, actualPos: 0, tp: 0 });
+    const G = groupsMap[g];
+    G.n++;
+    if (String(pred) === actual) G.correct++;
+    if (String(pred) === String(positive)) G.predPos++;
+    if (actual === String(positive)) { G.actualPos++; if (String(pred) === String(positive)) G.tp++; }
+  }
+  const groups = Object.entries(groupsMap).filter(([, g]) => g.n >= 5).map(([group, g]) => ({
+    group, n: g.n,
+    accuracy: r4(g.correct / g.n),
+    selection_rate: r4(g.predPos / g.n),
+    tpr: g.actualPos ? r4(g.tp / g.actualPos) : null,
+  })).sort((a, b) => b.n - a.n);
+  if (groups.length < 2) return { error: true, message: 'São necessários ≥ 2 grupos com dados suficientes.' };
+  const accs = groups.map((g) => g.accuracy), sels = groups.map((g) => g.selection_rate);
+  const maxSel = Math.max(...sels) || 1;
+  return {
+    positive_class: positive, sensitive: sensitiveColumn, groups,
+    accuracy_gap: r4(Math.max(...accs) - Math.min(...accs)),
+    selection_rate_gap: r4(Math.max(...sels) - Math.min(...sels)),
+    disparate_impact: r4(Math.min(...sels) / maxSel), // 80% rule: >= 0.8 desejável
+    fair: (Math.min(...sels) / maxSel) >= 0.8 && (Math.max(...accs) - Math.min(...accs)) <= 0.1,
+  };
+}
+
 function split(X, y, ratio, rand) {
   const n = X.length;
   const idx = shuffleIdx(n, rand);
