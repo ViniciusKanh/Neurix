@@ -8,7 +8,7 @@ import {
   Download, FlaskConical, Settings2, PackageSearch,
   ChevronDown, GitCompare, History, Wand2,
   Settings, UsersRound, LogOut,
-  SlidersHorizontal, Layers as LayersIcon
+  SlidersHorizontal, Layers as LayersIcon, TerminalSquare, Sigma
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -30,6 +30,8 @@ const NAV_GROUPS = [
     items: [
       { icon: Database, label: 'Explorador de Dados', path: '/explorer' },
       { icon: BarChart2, label: 'Perfilamento de Dados', path: '/data-profiling' },
+      { icon: TerminalSquare, label: 'Workbench SQL', path: '/sql' },
+      { icon: Sigma, label: 'Laboratório Estatístico', path: '/statistics' },
       { icon: Download, label: 'Exportar Dataset', path: '/dataset-export' },
     ],
   },

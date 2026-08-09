@@ -16,6 +16,7 @@ import { Brain, Play, Loader2, GitCompare, Settings2, Trash2, Wrench, Pencil } f
 import { runClassification, runRegression, runClustering, runAnomalyDetection, runDimReduction, runFeatureSelection } from '@/lib/localML';
 import { runRealClassification, runRealRegression, runRealClustering, crossValidate, permutationImportance, classBalance } from '@/lib/realML';
 import { getDataset, saveDataset, hasDataset } from '@/lib/datasetStore';
+import { detectTargetLeakage } from '@/lib/dataQuality';
 import { AlertTriangle } from 'lucide-react';
 import { parseAnyFile } from '@/lib/parseDataset';
 import { toast } from 'sonner';
@@ -161,6 +162,7 @@ export default function MLStudio() {
   const [customName, setCustomName] = useState('');
   const [localOk, setLocalOk] = useState(null); // null=unknown, true/false
   const [balanceInfo, setBalanceInfo] = useState(null); // pre-run class balance (classification)
+  const [leakInfo, setLeakInfo] = useState(null); // pre-run target-leakage detection
   const reloadRef = useRef();
   const queryClient = useQueryClient();
   void Wrench;
@@ -203,17 +205,18 @@ export default function MLStudio() {
   };
   const taskDef = TASK_TYPES.find(t => t.value === taskType);
 
-  // Pre-run class-balance check (classification) so the user sees imbalance before training.
+  // Pre-run checks (class balance + target leakage) once a target is chosen.
   useEffect(() => {
     let alive = true;
-    setBalanceInfo(null);
-    if (taskType !== 'classification' || !targetColumn || !selectedProjectId || !localOk) return;
+    setBalanceInfo(null); setLeakInfo(null);
+    if (!['classification', 'regression'].includes(taskType) || !targetColumn || !selectedProjectId || !localOk) return;
     (async () => {
       try {
         const d = await getDataset(selectedProjectId);
         if (!alive || !d?.rows?.length) return;
-        const b = classBalance(d.rows, targetColumn);
-        if (alive && !b.error) setBalanceInfo(b);
+        if (taskType === 'classification') { const b = classBalance(d.rows, targetColumn); if (alive && !b.error) setBalanceInfo(b); }
+        const lk = detectTargetLeakage(d.rows, targetColumn, project?.column_info || [], taskType);
+        if (alive && lk.has_leak) setLeakInfo(lk);
       } catch { /* ignore */ }
     })();
     return () => { alive = false; };
@@ -503,6 +506,25 @@ export default function MLStudio() {
                 </Button>
               </div>
             </div>
+
+            {/* Target-leakage warning (pre-run) */}
+            {leakInfo?.has_leak && (
+              <div className="mt-4 rounded-lg border border-destructive/50 bg-destructive/5 p-3 flex items-start gap-2.5">
+                <AlertTriangle className="w-4 h-4 text-destructive flex-shrink-0 mt-0.5" />
+                <div className="text-xs">
+                  <p className="font-semibold text-destructive">Possível vazamento de alvo (data leakage)</p>
+                  <p className="text-muted-foreground mt-0.5">
+                    Estas variáveis parecem "prever bem demais" o alvo e podem inflar as métricas artificialmente:
+                  </p>
+                  <ul className="mt-1 space-y-0.5">
+                    {leakInfo.leaks.map((l) => (
+                      <li key={l.feature} className="text-muted-foreground"><code className="text-foreground">{l.feature}</code> — {l.reason}</li>
+                    ))}
+                  </ul>
+                  <p className="text-muted-foreground mt-1">Considere remover essas colunas antes de treinar (Explorador → Limpeza) se elas não estariam disponíveis no momento da predição real.</p>
+                </div>
+              </div>
+            )}
 
             {/* Class-imbalance warning (pre-run) */}
             {taskType === 'classification' && balanceInfo?.imbalanced && (

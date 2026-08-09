@@ -7,6 +7,8 @@ export const PAGES = [
   { key: 'projects', label: 'Projetos', path: '/projects' },
   { key: 'explorer', label: 'Explorador de Dados', path: '/explorer' },
   { key: 'data-profiling', label: 'Perfilamento de Dados', path: '/data-profiling' },
+  { key: 'sql', label: 'Workbench SQL', path: '/sql' },
+  { key: 'statistics', label: 'Laboratório Estatístico', path: '/statistics' },
   { key: 'dataset-export', label: 'Exportar Dataset', path: '/dataset-export' },
   { key: 'ml-studio', label: 'ML Studio', path: '/ml-studio' },
   { key: 'model-lab', label: 'Laboratório do Modelo', path: '/model-lab' },

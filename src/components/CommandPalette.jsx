@@ -11,6 +11,8 @@ const ITEMS = [
   { label: 'Novo Projeto', path: '/projects/new', kw: 'criar novo dataset upload' },
   { label: 'Explorador de Dados', path: '/explorer', kw: 'eda dados exploração' },
   { label: 'Perfilamento de Dados', path: '/data-profiling', kw: 'profiling' },
+  { label: 'Workbench SQL', path: '/sql', kw: 'sql consulta query select agregação' },
+  { label: 'Laboratório Estatístico', path: '/statistics', kw: 'estatistica teste hipotese t-test anova qui-quadrado normalidade correlação p-valor' },
   { label: 'ML Studio', path: '/ml-studio', kw: 'treinar modelo classificação regressão' },
   { label: 'Laboratório do Modelo', path: '/model-lab', kw: 'simulador xai explicação fronteira avaliação what-if' },
   { label: 'Scoring em Lote', path: '/batch-score', kw: 'pontuar prever csv lote batch' },
