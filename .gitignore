@@ -5,6 +5,7 @@ dist_v2
 dist_v3
 dist_v4
 dist_v5
+dist_v6
 .vercel
 .env
 .env.local

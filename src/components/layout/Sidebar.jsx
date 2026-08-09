@@ -8,7 +8,8 @@ import {
   Download, FlaskConical, Settings2, PackageSearch,
   ChevronDown, GitCompare, History, Wand2,
   Settings, UsersRound, LogOut,
-  SlidersHorizontal, Layers as LayersIcon, TerminalSquare, Sigma
+  SlidersHorizontal, Layers as LayersIcon, TerminalSquare, Sigma,
+  MapPin, Combine
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -33,6 +34,9 @@ const NAV_GROUPS = [
       { icon: TerminalSquare, label: 'Workbench SQL', path: '/sql' },
       { icon: Sigma, label: 'Laboratório Estatístico', path: '/statistics' },
       { icon: Wand2, label: 'Feature Engineering', path: '/feature-lab' },
+      { icon: FileText, label: 'Text Mining / NLP', path: '/text-mining' },
+      { icon: MapPin, label: 'Mineração Geoespacial', path: '/geo' },
+      { icon: Combine, label: 'Join & Blend', path: '/blend' },
       { icon: Download, label: 'Exportar Dataset', path: '/dataset-export' },
     ],
   },
@@ -46,6 +50,7 @@ const NAV_GROUPS = [
       { icon: GitBranch, label: 'Comparação de Modelos', path: '/model-comparison' },
       { icon: Settings2, label: 'Hyperparameter Tuning', path: '/hyperparam-tuning' },
       { icon: GitBranch, label: 'Regra de Associação', path: '/association-rules' },
+      { icon: GitBranch, label: 'Padrões Sequenciais', path: '/sequences' },
       { icon: TrendingUp, label: 'Séries Temporais', path: '/time-series' },
     ],
   },

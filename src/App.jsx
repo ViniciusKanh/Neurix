@@ -22,6 +22,10 @@ const MLStudio = lazy(() => import('./pages/MLStudio'));
 const SQLWorkbench = lazy(() => import('./pages/SQLWorkbench'));
 const StatisticsLab = lazy(() => import('./pages/StatisticsLab'));
 const FeatureLab = lazy(() => import('./pages/FeatureLab'));
+const TextMining = lazy(() => import('./pages/TextMining'));
+const SequenceMining = lazy(() => import('./pages/SequenceMining'));
+const DataBlend = lazy(() => import('./pages/DataBlend'));
+const GeoMining = lazy(() => import('./pages/GeoMining'));
 const Visualization3D = lazy(() => import('./pages/Visualization3D'));
 const Reports = lazy(() => import('./pages/Reports'));
 const AssociationRules = lazy(() => import('./pages/AssociationRules'));
@@ -88,6 +92,10 @@ const AuthenticatedApp = () => {
         <Route path="/sql" element={<SQLWorkbench />} />
         <Route path="/statistics" element={<StatisticsLab />} />
         <Route path="/feature-lab" element={<FeatureLab />} />
+        <Route path="/text-mining" element={<TextMining />} />
+        <Route path="/sequences" element={<SequenceMining />} />
+        <Route path="/blend" element={<DataBlend />} />
+        <Route path="/geo" element={<GeoMining />} />
         <Route path="/ml-studio" element={<MLStudio />} />
         <Route path="/model-lab" element={<ModelLab />} />
         <Route path="/batch-score" element={<BatchScore />} />
