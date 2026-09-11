@@ -17,6 +17,9 @@ import { useAuth } from '@/lib/AuthContext';
 import { getDataset, saveDataset } from '@/lib/datasetStore';
 import { buildProfile } from '@/lib/datasetProfile';
 import { applySuggestion, validateSuggestion, transformLabel } from '@/lib/aiFeatures';
+import { correlationMatrix, detectTargetLeakage } from '@/lib/dataQuality';
+import { classBalance } from '@/lib/realML';
+import { getAI, saveAI } from '@/lib/aiCache';
 
 // transform family → accent color (encodes the kind of engineering move)
 const FAMILY = {
@@ -36,6 +39,8 @@ export default function AIAdvisor() {
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
+  const [cachedAt, setCachedAt] = useState(null); // when the shown analysis was generated
+  const [stale, setStale] = useState(false);       // dataset changed since the cached analysis
 
   // working copy for applied features
   const [working, setWorking] = useState(null);
@@ -49,23 +54,55 @@ export default function AIAdvisor() {
   const cols = (project?.column_info || []).map((c) => c.name);
 
   useEffect(() => {
-    let alive = true; setRows(null); setResult(null); setWorking(null); setAppliedNames([]); setAppliedLog([]); setTarget('__none__'); setTask('__none__');
+    let alive = true; setRows(null); setResult(null); setWorking(null); setAppliedNames([]); setAppliedLog([]); setTarget('__none__'); setTask('__none__'); setError(null); setCachedAt(null); setStale(false);
     if (!projectId) { setDsState('none'); return; }
     setDsState('loading');
-    (async () => { try { const d = await getDataset(projectId); if (!alive) return; if (!d?.rows?.length) { setDsState('missing'); return; } setRows(d.rows); setWorking(d.rows); setDsState('ready'); } catch { if (alive) setDsState('missing'); } })();
+    (async () => {
+      try {
+        const d = await getDataset(projectId);
+        if (!alive) return;
+        if (!d?.rows?.length) { setDsState('missing'); return; }
+        setRows(d.rows); setWorking(d.rows); setDsState('ready');
+        // Pull the LAST analysis from local cache (no token spend).
+        const cached = await getAI(`advisor:${projectId}`);
+        if (alive && cached?.data) {
+          setResult(cached.data); setCachedAt(cached.savedAt);
+          const sig = cached.signature;
+          if (sig && (sig.rows !== d.rows.length || sig.cols !== Object.keys(d.rows[0]).length)) setStale(true);
+        }
+      } catch { if (alive) setDsState('missing'); }
+    })();
     return () => { alive = false; };
   }, [projectId]);
 
   const currentCols = useMemo(() => (working?.length ? Object.keys(working[0]) : cols), [working, cols]);
 
+  // Real signals computed by our own engine — grounds the AI so it doesn't guess.
+  const computeSignals = (dataRows, colInfo, tgt, tsk) => {
+    const signals = {};
+    try { const corr = correlationMatrix(dataRows, colInfo, 0.8); if (!corr.error && corr.high_pairs?.length) signals.high_correlations = corr.high_pairs.slice(0, 10); } catch { /* */ }
+    const constants = (colInfo || []).filter((c) => (c.unique_count || 0) === 1).map((c) => c.name);
+    if (constants.length) signals.constant_columns = constants;
+    if (tgt) {
+      const inferred = tsk || (colInfo?.find((c) => c.name === tgt && ['number', 'float', 'int', 'integer', 'numeric', 'float64', 'int64', 'double'].includes((c.type || '').toLowerCase())) ? 'regression' : 'classification');
+      try { const lk = detectTargetLeakage(dataRows, tgt, colInfo, inferred); if (lk.has_leak) signals.leakage = lk.leaks; } catch { /* */ }
+      if (inferred === 'classification') { try { const b = classBalance(dataRows, tgt); if (!b.error) signals.class_balance = b; } catch { /* */ } }
+    }
+    return signals;
+  };
+
   const analyze = async () => {
     if (!rows || !rows.length) { toast.error('Selecione um projeto com dataset neste dispositivo.'); return; }
-    setRunning(true); setResult(null); setError(null);
+    setRunning(true); setError(null);
     try {
-      const profile = buildProfile(rows, project?.column_info, { target: target === '__none__' ? '' : target, task: task === '__none__' ? '' : task });
+      const tgt = target === '__none__' ? '' : target;
+      const tsk = task === '__none__' ? '' : (task === 'classificação' ? 'classification' : task === 'regressão' ? 'regression' : 'clustering');
+      const profile = buildProfile(rows, project?.column_info, { target: tgt, task: task === '__none__' ? '' : task });
+      profile.signals = computeSignals(rows, project?.column_info, tgt, tsk);
       const r = await aiApi.analyze(profile);
       if (!r || (!r.suggested_features && !r.dataset_summary)) throw new Error('O Gemini respondeu, mas sem conteúdo utilizável. Tente novamente ou troque o modelo em Configurações → IA.');
-      setResult(r);
+      setResult(r); setCachedAt(new Date().toISOString()); setStale(false);
+      await saveAI(`advisor:${projectId}`, r, { rows: rows.length, cols: Object.keys(rows[0]).length });
       toast.success('Análise concluída pelo Gemini.');
     } catch (e) {
       console.error('[AIAdvisor] analyze falhou:', e);
@@ -143,7 +180,7 @@ export default function AIAdvisor() {
           </div>
           <div className="flex items-end">
             <Button onClick={analyze} disabled={dsState !== 'ready' || running} className="w-full bg-primary text-primary-foreground hover:bg-primary/90 glow-primary">
-              {running ? <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> Analisando…</> : <><Wand2 className="w-4 h-4 mr-1.5" /> Analisar com IA</>}
+              {running ? <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> Analisando…</> : <><Wand2 className="w-4 h-4 mr-1.5" /> {result ? 'Analisar novamente' : 'Analisar com IA'}</>}
             </Button>
           </div>
         </div>
@@ -184,7 +221,13 @@ export default function AIAdvisor() {
           {/* Diagnosis hero */}
           <div className="relative overflow-hidden rounded-2xl border border-primary/20 glass-strong hud-corners p-6">
             <div className="pointer-events-none absolute -right-10 -top-16 w-72 h-72 rounded-full bg-primary/10 blur-[90px]" />
-            <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-primary/60 mb-2 flex items-center gap-2"><Sparkles className="w-3.5 h-3.5" /> Diagnóstico · {result.model}</p>
+            <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+              <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-primary/60 flex items-center gap-2"><Sparkles className="w-3.5 h-3.5" /> Diagnóstico · {result.model || 'Gemini'}</p>
+              {cachedAt && <span className="text-[10px] text-muted-foreground">Gerada em {new Date(cachedAt).toLocaleString('pt-BR')} · salva localmente</span>}
+            </div>
+            {stale && (
+              <p className="text-[11px] text-amber-400 mb-2">⚠ O dataset mudou desde esta análise. Clique em “Analisar novamente” para atualizar.</p>
+            )}
             <p className="text-base sm:text-lg text-foreground leading-relaxed font-display max-w-3xl">{result.dataset_summary}</p>
           </div>
 

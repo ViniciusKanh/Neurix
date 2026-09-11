@@ -56,6 +56,13 @@ function buildPrompt(profile) {
     return parts.join(' · ');
   }).join('\n');
   const sample = JSON.stringify((profile.sample || []).slice(0, 12));
+  const sig = profile.signals || {};
+  const signalLines = [];
+  if (sig.high_correlations?.length) signalLines.push(`- Correlações fortes (|r|≥0.8): ${sig.high_correlations.map((p) => `${p.a}~${p.b} (r=${p.r})`).join('; ')}`);
+  if (sig.leakage?.length) signalLines.push(`- Suspeita de VAZAMENTO DE ALVO: ${sig.leakage.map((l) => `${l.feature} (${l.reason})`).join('; ')}`);
+  if (sig.class_balance) signalLines.push(`- Balanceamento do alvo: ${sig.class_balance.classes.map((c) => `${c.label} ${c.pct}%`).join(', ')} (razão ${sig.class_balance.imbalance_ratio}×, ${sig.class_balance.imbalanced ? 'DESBALANCEADO' : 'ok'})`);
+  if (sig.constant_columns?.length) signalLines.push(`- Colunas praticamente constantes: ${sig.constant_columns.join(', ')}`);
+  const signalsBlock = signalLines.length ? `\n\nSINAIS JÁ CALCULADOS PELO APP (fatos reais — use como VERDADE, não recalcule):\n${signalLines.join('\n')}` : '';
 
   return `Você é um cientista de dados sênior, especialista em mineração de dados, pré-processamento e engenharia de atributos. Seja concreto, técnico e específico para ESTE dataset — nada de conselhos genéricos.
 
@@ -67,7 +74,7 @@ DATASET
 COLUNAS (nome (tipo[, papel]) · nulos% · únicos · stats):
 ${cols}
 
-AMOSTRA (até 12 linhas): ${sample}
+AMOSTRA (até 12 linhas): ${sample}${signalsBlock}
 
 O QUE PRODUZIR (pense como se fosse preparar estes dados para modelagem):
 1) dataset_summary: 2-4 frases descrevendo o que o dataset parece representar, sua qualidade geral e o potencial analítico.
@@ -76,6 +83,8 @@ O QUE PRODUZIR (pense como se fosse preparar estes dados para modelagem):
 4) recommended_tasks: tarefas de ML adequadas (classificação/regressão/clustering/associação) com "target" (coluna real ou "") e "reason".
 5) preprocessing_steps: lista ORDENADA (strings) do pipeline recomendado antes de treinar (tratamento de nulos, encoding, escala, remoção de vazamento, etc.).
 6) suggested_features: 4-10 NOVAS features realmente úteis para modelagem (razões, interações, agregações, indicadores, discretizações, transformações). Priorize ganho preditivo e interpretabilidade.
+
+Se houver SINAIS calculados: reflita as correlações fortes (multicolinearidade), o vazamento de alvo e o desbalanceamento nos quality_issues; NÃO sugira como feature nenhuma coluna marcada como vazamento; ao propor razões/interações, evite combinar variáveis já fortemente correlacionadas.
 
 REGRAS ESTRITAS das features (o app aplica automaticamente):
 - Use SOMENTE nomes de colunas existentes acima. Não invente colunas nem valores.
@@ -108,18 +117,19 @@ export async function callGeminiInterpret(ctx) {
 }
 
 function buildInterpretPrompt(ctx) {
-  return `Você é um cientista de dados explicando o resultado de um modelo para um público técnico, de forma clara e acionável.
+  // Generic, works for model results, data profiling, reports, etc. — the app
+  // passes only already-computed numbers/facts in ctx.
+  const kind = ctx.kind || (ctx.metrics ? 'resultado de modelo de machine learning' : 'conjunto de dados');
+  return `Você é um cientista de dados sênior. Escreva uma interpretação clara, técnica e ACIONÁVEL (em português do Brasil) sobre o ${kind} descrito no contexto abaixo. O contexto contém apenas números e fatos já calculados pelo aplicativo — use-os como verdade e NÃO invente valores.
 
-Projeto: ${ctx.project || '-'}
-Tarefa: ${ctx.task || '-'} · Coluna-alvo: ${ctx.target || '-'}
-Melhor modelo: ${ctx.best_model || '-'}
-${ctx.class_labels ? `Classes: ${ctx.class_labels.join(', ')}\n` : ''}Métricas: ${JSON.stringify(ctx.metrics || {})}
-${ctx.cross_validation ? `Validação cruzada: ${JSON.stringify(ctx.cross_validation)}\n` : ''}${ctx.feature_importance?.length ? `Features mais importantes: ${ctx.feature_importance.slice(0, 8).map((f) => f.feature).join(', ')}\n` : ''}${ctx.class_balance ? `Balanceamento: ${JSON.stringify(ctx.class_balance)}\n` : ''}
+CONTEXTO (JSON):
+${JSON.stringify(ctx).slice(0, 6000)}
+
 Produza:
-- interpretation: 1 a 3 parágrafos em markdown explicando o que as métricas significam na prática, se o modelo está bom, riscos (overfitting, desbalanceamento, vazamento) e o que as features importantes indicam.
-- recommendations: 3 a 5 próximos passos concretos (melhorar dados, features, modelo, validação ou uso em produção).
+- interpretation: 1 a 3 parágrafos em markdown explicando o que os números significam na prática, se o resultado é bom, riscos relevantes (ex.: overfitting, desbalanceamento, vazamento de alvo, multicolinearidade, nulos) e o que se destaca.
+- recommendations: 3 a 5 próximos passos concretos e específicos.
 
-Responda APENAS com JSON: {"interpretation":"","recommendations":[""]}. Em português do Brasil, sem inventar números além dos fornecidos.`;
+Responda APENAS com JSON: {"interpretation":"","recommendations":[""]}.`;
 }
 
 // ---- shared helpers ----

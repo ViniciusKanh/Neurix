@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import AIInsight from '@/components/ai/AIInsight';
 
 const REPORT_TYPES = [
   { value: 'technical', label: 'Relatório Técnico Completo', desc: 'Metodologia, métricas e análise detalhada' },
@@ -446,6 +447,23 @@ export default function Reports() {
           </p>
         )}
       </GlowCard>
+
+      {selectedProjectId && (
+        <div className="mb-6">
+          <AIInsight
+            cacheKey={`report:${selectedProjectId}`}
+            enabled={!!project}
+            title="Resumo executivo por IA (Gemini)"
+            label="Gerar resumo com IA"
+            buildContext={() => ({
+              kind: 'projeto de dados e seus modelos, para um resumo executivo',
+              project: project?.name, description: project?.description,
+              rows: project?.dataset_size, columns: project?.dataset_columns,
+              analyses: analyses.slice(0, 8).map((a) => ({ name: a.name, type: a.type, status: a.status, best_model: a.results?.best_model, metrics: a.results?.metrics })),
+            })}
+          />
+        </div>
+      )}
 
       {report ? (
         <GlowCard>

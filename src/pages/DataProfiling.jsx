@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getDataset } from '@/lib/datasetStore';
 import { correlationMatrix } from '@/lib/dataQuality';
+import AIInsight from '@/components/ai/AIInsight';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import {
@@ -522,6 +523,23 @@ export default function DataProfiling() {
               </motion.div>
             ))}
           </div>
+
+          {/* Optional AI reading of the data quality (cached) */}
+          <AIInsight
+            cacheKey={`profile:${selectedProjectId}`}
+            enabled={!!project}
+            title="Leitura dos dados por IA (Gemini)"
+            label="Analisar qualidade com IA"
+            buildContext={() => ({
+              kind: 'perfilamento de um conjunto de dados',
+              project: project?.name,
+              rows: project?.dataset_size, columns_count: project?.dataset_columns || project?.column_info?.length,
+              numeric_columns: numericCols, categorical_columns: catCols,
+              health_score: healthScore, total_nulls: totalNulls, total_outliers: totalOutliers,
+              high_correlations: (realCorr?.high_pairs || []).slice(0, 8),
+              columns: (project?.column_info || []).slice(0, 40).map((c) => ({ name: c.name, type: c.type, unique: c.unique_count, null_pct: c.null_percent })),
+            })}
+          />
 
           {/* Tabs */}
           <div className="flex gap-1 bg-secondary/40 p-1 rounded-xl w-fit overflow-x-auto">
