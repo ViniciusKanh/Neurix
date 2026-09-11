@@ -337,9 +337,8 @@ function TwoFactorCard({ user, refreshUser }) {
 
 // ---------------------------------------------------------------- IA / Gemini (admin)
 const GEMINI_MODELS = [
-  { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash — rápido e econômico (recomendado)' },
-  { id: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash — rápido' },
-  { id: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro — mais capaz' },
+  { id: 'gemini-3.6-flash', label: 'Gemini 3.6 Flash — rápido e econômico (recomendado)' },
+  { id: 'gemini-3.6-pro', label: 'Gemini 3.6 Pro — mais capaz' },
 ];
 
 function GeminiTab() {
@@ -350,7 +349,7 @@ function GeminiTab() {
 
   useEffect(() => {
     settingsApi.getGemini()
-      .then((c) => setCfg({ enabled: false, model: 'gemini-2.0-flash', configured: false, api_key: '', ...c }))
+      .then((c) => setCfg({ enabled: false, model: 'gemini-3.6-flash', configured: false, api_key: '', ...c }))
       .catch((e) => toast.error(e.message))
       .finally(() => setLoading(false));
   }, []);
@@ -397,9 +396,11 @@ function GeminiTab() {
           </div>
           <div>
             <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Modelo</label>
-            <select className={`${field} mt-1`} value={cfg.model} onChange={(e) => set('model', e.target.value)}>
+            <input list="gemini-models" className={`${field} mt-1 font-mono`} value={cfg.model} onChange={(e) => set('model', e.target.value)} placeholder="gemini-3.6-flash" />
+            <datalist id="gemini-models">
               {GEMINI_MODELS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
-            </select>
+            </datalist>
+            <p className="text-[10px] text-muted-foreground mt-1">Escolha uma sugestão ou digite o nome de outro modelo do Gemini. Modelos antigos (1.x/2.x) são atualizados automaticamente.</p>
           </div>
         </div>
 

@@ -3,7 +3,18 @@ import { queryOne, run } from './db.js';
 // Gemini config lives in the `settings` table under key 'gemini' as JSON:
 // { enabled, api_key, model }. The api_key never leaves the server.
 const KEY = 'gemini';
-export const GEMINI_MODELS = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+export const DEFAULT_MODEL = 'gemini-3.6-flash';
+// Convenience suggestions for the UI. The admin may also type any other model.
+export const GEMINI_MODELS = ['gemini-3.6-flash', 'gemini-3.6-pro'];
+// Models Google has retired — auto-upgraded to the current default on use.
+const DEPRECATED = new Set(['gemini-2.0-flash', 'gemini-2.0-flash-exp', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-1.0-pro', 'gemini-pro']);
+
+// Keep any admin-typed model, but replace retired ones (and blanks) with the default.
+export function normalizeModel(m) {
+  const s = (m || '').trim();
+  if (!s || DEPRECATED.has(s)) return DEFAULT_MODEL;
+  return s;
+}
 
 export async function getGeminiConfig() {
   const row = await queryOne('SELECT value FROM settings WHERE key = ?', [KEY]);
@@ -18,7 +29,7 @@ export async function saveGeminiConfig(cfg) {
   if ((!apiKey || apiKey === '••••••••') && existing?.api_key) apiKey = existing.api_key;
   const clean = {
     enabled: !!cfg.enabled,
-    model: GEMINI_MODELS.includes(cfg.model) ? cfg.model : 'gemini-2.0-flash',
+    model: normalizeModel(cfg.model),
     api_key: apiKey,
   };
   await run(
@@ -31,8 +42,8 @@ export async function saveGeminiConfig(cfg) {
 
 // Config safe to send to the client (key masked, never the real value).
 export function maskGeminiConfig(cfg) {
-  if (!cfg) return { enabled: false, model: 'gemini-2.0-flash', configured: false, api_key: '' };
-  return { enabled: !!cfg.enabled, model: cfg.model || 'gemini-2.0-flash', configured: !!cfg.api_key, api_key: cfg.api_key ? '••••••••' : '' };
+  if (!cfg) return { enabled: false, model: DEFAULT_MODEL, configured: false, api_key: '' };
+  return { enabled: !!cfg.enabled, model: normalizeModel(cfg.model), configured: !!cfg.api_key, api_key: cfg.api_key ? '••••••••' : '' };
 }
 
 const SUPPORTED_TRANSFORMS = 'formula | binning | onehot | label | scale | log';
@@ -116,7 +127,7 @@ async function requireCfg() {
   const cfg = await getGeminiConfig();
   if (!cfg || !cfg.api_key) { const e = new Error('Gemini não configurado. Um administrador deve cadastrar a chave em Configurações → IA.'); e.code = 'NO_KEY'; throw e; }
   if (!cfg.enabled) { const e = new Error('A integração com o Gemini está desativada. Ative em Configurações → IA.'); e.code = 'DISABLED'; throw e; }
-  return { ...cfg, model: cfg.model || 'gemini-2.0-flash' };
+  return { ...cfg, model: normalizeModel(cfg.model) };
 }
 
 async function generate(cfg, prompt, maxOutputTokens = 3072) {
@@ -137,7 +148,7 @@ async function generate(cfg, prompt, maxOutputTokens = 3072) {
 
 // Minimal ping to validate a candidate key/model (used by the test button).
 export async function pingGemini(apiKey, model) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model || 'gemini-2.0-flash'}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${normalizeModel(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
   const resp = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: 'ping' }] }], generationConfig: { maxOutputTokens: 5 } }) });
   if (!resp.ok) { let msg = `HTTP ${resp.status}`; try { const j = await resp.json(); msg = j?.error?.message || msg; } catch { /* */ } throw new Error(msg); }
   return true;
