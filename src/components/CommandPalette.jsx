@@ -14,6 +14,7 @@ const ITEMS = [
   { label: 'Workbench SQL', path: '/sql', kw: 'sql consulta query select agregação' },
   { label: 'Laboratório Estatístico', path: '/statistics', kw: 'estatistica teste hipotese t-test anova qui-quadrado normalidade correlação p-valor' },
   { label: 'Feature Engineering', path: '/feature-lab', kw: 'features engenharia derivada binning encoding escala normalização log transformação' },
+  { label: 'Consultor IA (Gemini)', path: '/ai-advisor', kw: 'ia gemini consultor sugestão features pré-processamento análise' },
   { label: 'Text Mining / NLP', path: '/text-mining', kw: 'texto nlp tf-idf nuvem palavras tokenização sentimento' },
   { label: 'Mineração Geoespacial', path: '/geo', kw: 'mapa geo latitude longitude leaflet espacial' },
   { label: 'Join & Blend', path: '/blend', kw: 'juntar combinar concatenar merge join dataset' },

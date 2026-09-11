@@ -4,7 +4,7 @@ import { base44, settingsApi } from '@/api/base44Client';
 import PageHeader from '@/components/ui/PageHeader';
 import {
   User as UserIcon, Shield, Database, Camera, Loader2, Check,
-  KeyRound, ShieldCheck, ShieldOff, Palette, Mail, Send,
+  KeyRound, ShieldCheck, ShieldOff, Palette, Mail, Send, Sparkles,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { THEMES, applyTheme, getThemeId } from '@/lib/theme';
@@ -25,7 +25,7 @@ export default function Settings() {
   const isAdmin = user.role === 'admin';
   // Turso connection + Email are admin-only (infra config).
   const TABS = isAdmin
-    ? [...BASE_TABS, { key: 'email', label: 'Email', icon: Mail }, { key: 'connection', label: 'Conexão Turso', icon: Database }]
+    ? [...BASE_TABS, { key: 'ai', label: 'IA (Gemini)', icon: Sparkles }, { key: 'email', label: 'Email', icon: Mail }, { key: 'connection', label: 'Conexão Turso', icon: Database }]
     : BASE_TABS;
 
   return (
@@ -51,6 +51,7 @@ export default function Settings() {
 
       {tab === 'profile' && <ProfileTab user={user} setUser={setUser} refreshUser={refreshUser} />}
       {tab === 'appearance' && <AppearanceTab />}
+      {tab === 'ai' && isAdmin && <GeminiTab />}
       {tab === 'email' && isAdmin && <EmailTab />}
       {tab === 'security' && <SecurityTab user={user} refreshUser={refreshUser} />}
       {tab === 'connection' && isAdmin && <ConnectionTab />}
@@ -331,6 +332,91 @@ function TwoFactorCard({ user, refreshUser }) {
         </button>
       )}
     </Card>
+  );
+}
+
+// ---------------------------------------------------------------- IA / Gemini (admin)
+const GEMINI_MODELS = [
+  { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash — rápido e econômico (recomendado)' },
+  { id: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash — rápido' },
+  { id: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro — mais capaz' },
+];
+
+function GeminiTab() {
+  const [cfg, setCfg] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+
+  useEffect(() => {
+    settingsApi.getGemini()
+      .then((c) => setCfg({ enabled: false, model: 'gemini-2.0-flash', configured: false, api_key: '', ...c }))
+      .catch((e) => toast.error(e.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const set = (k, v) => setCfg((c) => ({ ...c, [k]: v }));
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const saved = await settingsApi.saveGemini(cfg);
+      setCfg((c) => ({ ...c, ...saved }));
+      toast.success('Configuração do Gemini salva');
+    } catch (e) { toast.error(e.message); } finally { setSaving(false); }
+  };
+
+  const test = async () => {
+    setTesting(true);
+    try {
+      await settingsApi.testGemini({ api_key: cfg.api_key, model: cfg.model });
+      toast.success('Chave válida! O Gemini respondeu.');
+    } catch (e) { toast.error(e.message); } finally { setTesting(false); }
+  };
+
+  if (loading) return <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
+
+  return (
+    <>
+      <Card title="Google Gemini" desc="Conecte uma chave da API do Gemini para habilitar o Consultor de Pré-processamento com IA. Gere sua chave em aistudio.google.com/apikey. A chave fica no servidor e nunca é exposta ao navegador.">
+        <div className="flex items-center gap-2 mb-4">
+          <span className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-semibold ${cfg.configured ? 'bg-accent/15 text-accent' : 'bg-secondary text-muted-foreground'}`}>
+            <KeyRound className="w-3.5 h-3.5" /> {cfg.configured ? 'Chave cadastrada' : 'Sem chave'}
+          </span>
+        </div>
+
+        <label className="flex items-center gap-2 text-sm text-foreground mb-4">
+          <input type="checkbox" checked={cfg.enabled} onChange={(e) => set('enabled', e.target.checked)} className="accent-primary" />
+          Habilitar o Consultor de IA para os usuários
+        </label>
+
+        <div className="grid grid-cols-1 gap-4">
+          <div>
+            <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Chave da API</label>
+            <input type="password" className={`${field} mt-1`} value={cfg.api_key} onChange={(e) => set('api_key', e.target.value)} placeholder={cfg.configured ? '•••••••• (deixe em branco para manter)' : 'AIza...'} />
+          </div>
+          <div>
+            <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Modelo</label>
+            <select className={`${field} mt-1`} value={cfg.model} onChange={(e) => set('model', e.target.value)}>
+              {GEMINI_MODELS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+            </select>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-3 mt-4">
+          <button onClick={save} disabled={saving} className={btn}>
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Salvar configuração
+          </button>
+          <button onClick={test} disabled={testing} className="flex items-center justify-center gap-2 rounded-lg border border-primary/50 text-primary font-semibold py-2.5 px-4 text-sm hover:bg-primary/10 transition disabled:opacity-50">
+            {testing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />} Testar chave
+          </button>
+        </div>
+      </Card>
+
+      <Card title="Privacidade" desc="Ao usar o Consultor, o Neurix envia ao Gemini apenas um perfil do dataset — nomes e tipos de colunas, estatísticas resumidas e uma pequena amostra (até 12 linhas). Nenhum dado completo é enviado, e a chamada parte sempre do servidor.">
+        <p className="text-[11px] text-muted-foreground">A integração é opcional. Com ela desativada, todo o resto do Neurix continua funcionando 100% local, sem IA.</p>
+      </Card>
+    </>
   );
 }
 

@@ -9,7 +9,7 @@ import {
   ChevronDown, GitCompare, History, Wand2,
   Settings, UsersRound, LogOut,
   SlidersHorizontal, Layers as LayersIcon, TerminalSquare, Sigma,
-  MapPin, Combine
+  MapPin, Combine, Sparkles
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -34,6 +34,7 @@ const NAV_GROUPS = [
       { icon: TerminalSquare, label: 'Workbench SQL', path: '/sql' },
       { icon: Sigma, label: 'Laboratório Estatístico', path: '/statistics' },
       { icon: Wand2, label: 'Feature Engineering', path: '/feature-lab' },
+      { icon: Sparkles, label: 'Consultor IA', path: '/ai-advisor' },
       { icon: FileText, label: 'Text Mining / NLP', path: '/text-mining' },
       { icon: MapPin, label: 'Mineração Geoespacial', path: '/geo' },
       { icon: Combine, label: 'Join & Blend', path: '/blend' },

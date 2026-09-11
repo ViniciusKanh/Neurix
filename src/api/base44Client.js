@@ -103,6 +103,16 @@ export const settingsApi = {
   getEmail: () => api('/settings/email'),
   saveEmail: (cfg) => api('/settings/email', { method: 'POST', body: cfg }),
   testEmail: (cfg) => api('/settings/email/test', { method: 'POST', body: cfg }),
+  // Gemini (admin): key stays server-side; only masked config is returned.
+  getGemini: () => api('/settings/gemini'),
+  saveGemini: (cfg) => api('/settings/gemini', { method: 'POST', body: cfg }),
+  testGemini: (cfg) => api('/settings/gemini/test', { method: 'POST', body: cfg }),
+};
+
+// ---- AI advisor (any authenticated user) ----------------------------------
+export const aiApi = {
+  status: () => api('/ai/status'),
+  analyze: (profile) => api('/ai/analyze', { method: 'POST', body: { profile } }),
 };
 
 // ---- Full dataset rows (real training) -----------------------------------

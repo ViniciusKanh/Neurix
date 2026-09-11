@@ -6,7 +6,7 @@ config();
 
 import express from 'express';
 import {
-  authHandler, entitiesHandler, usersHandler, filesHandler, settingsHandler, datarowsHandler,
+  authHandler, entitiesHandler, usersHandler, filesHandler, settingsHandler, datarowsHandler, aiHandler,
 } from './api/_lib/handlers.js';
 import { makeCtx } from './api/_lib/adapter.js';
 
@@ -32,6 +32,7 @@ mount('users', usersHandler);
 mount('settings', settingsHandler);
 mount('datarows', datarowsHandler);
 mount('files', filesHandler);
+mount('ai', aiHandler);
 
 const port = process.env.API_PORT || 3001;
 app.listen(port, () => console.log(`\n  ⚡ Neurix API (dev) → http://localhost:${port}\n`));

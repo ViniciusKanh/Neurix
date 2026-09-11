@@ -540,7 +540,52 @@ export async function settingsHandler(req, res, ctx) {
     }
   }
 
+  // /api/settings/gemini
+  if (segments[0] === 'gemini') {
+    const { getGeminiConfig, saveGeminiConfig, maskGeminiConfig, pingGemini } = await import('./gemini.js');
+    // /api/settings/gemini/test
+    if (segments[1] === 'test' && method === 'POST') {
+      let key = (body.api_key || '').trim();
+      if (!key || key === '••••••••') { const stored = await getGeminiConfig(); key = stored?.api_key || ''; }
+      if (!key) return bad(res, 400, 'Informe a chave da API antes de testar.');
+      try { await pingGemini(key, body.model); return json(res, 200, { ok: true }); }
+      catch (e) { return bad(res, 400, `Falha ao validar a chave: ${e.message}`); }
+    }
+    if (method === 'GET') return json(res, 200, maskGeminiConfig(await getGeminiConfig()));
+    if (method === 'POST' || method === 'PUT') return json(res, 200, maskGeminiConfig(await saveGeminiConfig(body)));
+  }
+
   return bad(res, 404, 'Rota de configurações não encontrada');
+}
+
+// =====================================================================
+// AI  ->  /api/ai/*   (any authenticated user; uses the admin's key)
+// =====================================================================
+export async function aiHandler(req, res, ctx) {
+  const me = await currentUserRow(req);
+  if (!me) return bad(res, 401, 'Não autenticado');
+  const { segments, method, body } = ctx;
+  const { getGeminiConfig, maskGeminiConfig, callGeminiAnalyze } = await import('./gemini.js');
+
+  // GET /api/ai/status -> { configured, enabled, model } (no key exposed)
+  if (segments[0] === 'status' && method === 'GET') {
+    const cfg = maskGeminiConfig(await getGeminiConfig());
+    return json(res, 200, { configured: cfg.configured, enabled: cfg.enabled, model: cfg.model });
+  }
+
+  // POST /api/ai/analyze { profile } -> Gemini suggestions
+  if (segments[0] === 'analyze' && method === 'POST') {
+    if (!body?.profile?.columns?.length) return bad(res, 400, 'Perfil do dataset ausente.');
+    try {
+      const result = await callGeminiAnalyze(body.profile);
+      return json(res, 200, result);
+    } catch (e) {
+      const status = e.code === 'NO_KEY' || e.code === 'DISABLED' ? 400 : (e.status || 500);
+      return bad(res, status, e.message);
+    }
+  }
+
+  return bad(res, 404, 'Rota de IA não encontrada');
 }
 
 // =====================================================================

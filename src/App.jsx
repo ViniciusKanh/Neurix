@@ -26,6 +26,7 @@ const TextMining = lazy(() => import('./pages/TextMining'));
 const SequenceMining = lazy(() => import('./pages/SequenceMining'));
 const DataBlend = lazy(() => import('./pages/DataBlend'));
 const GeoMining = lazy(() => import('./pages/GeoMining'));
+const AIAdvisor = lazy(() => import('./pages/AIAdvisor'));
 const Visualization3D = lazy(() => import('./pages/Visualization3D'));
 const Reports = lazy(() => import('./pages/Reports'));
 const AssociationRules = lazy(() => import('./pages/AssociationRules'));
@@ -92,6 +93,7 @@ const AuthenticatedApp = () => {
         <Route path="/sql" element={<SQLWorkbench />} />
         <Route path="/statistics" element={<StatisticsLab />} />
         <Route path="/feature-lab" element={<FeatureLab />} />
+        <Route path="/ai-advisor" element={<AIAdvisor />} />
         <Route path="/text-mining" element={<TextMining />} />
         <Route path="/sequences" element={<SequenceMining />} />
         <Route path="/blend" element={<DataBlend />} />

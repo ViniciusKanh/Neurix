@@ -10,6 +10,7 @@ export const PAGES = [
   { key: 'sql', label: 'Workbench SQL', path: '/sql' },
   { key: 'statistics', label: 'Laboratório Estatístico', path: '/statistics' },
   { key: 'feature-lab', label: 'Feature Engineering', path: '/feature-lab' },
+  { key: 'ai-advisor', label: 'Consultor IA', path: '/ai-advisor' },
   { key: 'text-mining', label: 'Text Mining / NLP', path: '/text-mining' },
   { key: 'geo', label: 'Mineração Geoespacial', path: '/geo' },
   { key: 'blend', label: 'Join & Blend', path: '/blend' },
