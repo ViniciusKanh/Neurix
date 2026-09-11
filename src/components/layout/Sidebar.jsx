@@ -100,7 +100,7 @@ function NavGroup({ group, collapsed, mobileOpen, onLinkClick }) {
       {(!collapsed || mobileOpen) && (
         <button
           onClick={() => setOpen(!open)}
-          className="w-full flex items-center justify-between px-3 py-1.5 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+          className="w-full flex items-center justify-between px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/55 hover:text-muted-foreground transition-colors"
         >
           <span>{group.label}</span>
           <ChevronDown className={cn('w-3 h-3 transition-transform', !open && '-rotate-90')} />
@@ -125,20 +125,19 @@ function NavGroup({ group, collapsed, mobileOpen, onLinkClick }) {
                   onClick={onLinkClick}
                   title={collapsed && !mobileOpen ? item.label : undefined}
                   className={cn(
-                    'flex items-center gap-2.5 px-3 py-2 rounded-md text-[11px] font-semibold tracking-wide transition-all duration-150 relative group',
-                    'hover:bg-primary/8',
+                    'flex items-center gap-2.5 px-3 py-2 rounded-lg text-[11px] font-medium transition-colors duration-150 relative group',
                     isActive
-                      ? 'bg-primary/10 text-primary border-l-2 border-primary'
-                      : 'text-sidebar-foreground/60 hover:text-primary/80 border-l-2 border-transparent'
+                      ? 'bg-gradient-to-r from-primary/16 via-primary/8 to-transparent text-primary font-semibold'
+                      : 'text-sidebar-foreground/65 hover:text-foreground hover:bg-primary/8'
                   )}
                 >
                   {isActive && (
                     <motion.div
                       layoutId="activeNav"
-                      className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 bg-primary rounded-full"
+                      className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-primary rounded-full shadow-[0_0_10px_hsl(var(--primary)/0.7)]"
                     />
                   )}
-                  <item.icon className={cn('w-3.5 h-3.5 flex-shrink-0', isActive && 'text-primary')} />
+                  <item.icon className={cn('w-4 h-4 flex-shrink-0', isActive ? 'text-primary' : 'text-sidebar-foreground/50 group-hover:text-primary/80')} />
                   <AnimatePresence>
                     {(!collapsed || mobileOpen) && (
                       <motion.span

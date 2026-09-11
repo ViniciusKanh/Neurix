@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { base44 } from '@/api/base44Client';
-import { Loader2, ShieldCheck, ArrowRight, Lock, Mail, User, CheckCircle2, MailCheck } from 'lucide-react';
+import { Loader2, ShieldCheck, ArrowRight, Lock, Mail, User, CheckCircle2, MailCheck, BarChart3, Cpu, Rocket } from 'lucide-react';
 import { ModaraLogoMark } from '@/components/layout/ModaraLogo';
 
 export default function Login() {
@@ -100,10 +100,11 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen relative flex overflow-hidden bg-background bg-grid-pattern">
-      <div className="pointer-events-none absolute -top-32 -left-32 w-96 h-96 rounded-full bg-primary/20 blur-[120px] animate-glow-pulse" />
-      <div className="pointer-events-none absolute -bottom-40 -right-24 w-[28rem] h-[28rem] rounded-full bg-accent/20 blur-[130px] animate-glow-pulse" style={{ animationDelay: '1s' }} />
-      <div className="pointer-events-none absolute inset-0 bg-scan-lines opacity-30" />
+    <div className="min-h-screen relative flex overflow-hidden bg-background app-aurora">
+      <div className="pointer-events-none absolute inset-0 bg-grid-pattern opacity-60" />
+      <div className="pointer-events-none absolute -top-32 -left-32 w-96 h-96 rounded-full bg-primary/15 blur-[130px]" />
+      <div className="pointer-events-none absolute -bottom-44 -right-24 w-[30rem] h-[30rem] rounded-full bg-accent/12 blur-[150px]" />
+      <div className="pointer-events-none absolute inset-0 bg-scan-lines opacity-[0.04]" />
 
       <div className="relative w-full grid lg:grid-cols-2 min-h-screen">
       {/* ── Left: project explanation (desktop) ── */}
@@ -114,14 +115,14 @@ export default function Login() {
       <div className="relative w-full max-w-md">
         <div className="flex flex-col items-center mb-8">
           <div className="relative mb-3">
-            <div className="absolute inset-0 rounded-3xl bg-primary/30 blur-2xl scale-150" />
-            <ModaraLogoMark size={72} className="relative" />
+            <div className="absolute inset-0 rounded-3xl bg-primary/25 blur-2xl scale-150" />
+            <ModaraLogoMark size={68} className="relative" />
           </div>
-          <h1 className="font-display font-extrabold text-3xl tracking-[0.3em] text-gradient-primary">NEURIX</h1>
-          <p className="text-[10px] text-primary/50 font-mono uppercase tracking-[0.35em] mt-2">ML Workbench · 100% Local</p>
+          <h1 className="font-display font-bold text-3xl tracking-tight text-gradient-primary">Neurix</h1>
+          <p className="text-xs text-muted-foreground mt-1.5">Workbench de machine learning · 100% local</p>
         </div>
 
-        <div className="glass-strong rounded-2xl border border-primary/15 p-7 shadow-[0_0_40px_-10px_hsla(185,100%,50%,0.3)]">
+        <div className="glass-strong rounded-2xl border border-primary/15 p-7 shadow-[0_24px_60px_-24px_hsl(var(--primary)/0.35)]">
           {/* header */}
           {titleByPhase[phase] && (
             <div className="mb-5">
@@ -217,17 +218,16 @@ export default function Login() {
           )}
         </div>
 
-        <p className="text-center text-[10px] text-muted-foreground/50 mt-6 font-mono tracking-wider">NEURIX © {new Date().getFullYear()} · Machine Learning sem LLM externo</p>
-        <p className="text-center mt-2">
-          <a href="/privacy" className="text-[10px] text-muted-foreground/60 hover:text-primary underline">Política de Privacidade</a>
+        <p className="text-center text-[11px] text-muted-foreground/60 mt-6">
+          Neurix © {new Date().getFullYear()} · <a href="/privacy" className="hover:text-primary underline underline-offset-2">Política de Privacidade</a>
         </p>
       </div>
       </div>
       </div>
 
       <style>{`
-        .login-input { width:100%; border-radius:.6rem; background:hsla(220,40%,8%,.6); border:1px solid hsl(var(--border)); padding:.65rem .75rem; font-size:.875rem; color:hsl(var(--foreground)); transition:border-color .15s, box-shadow .15s; }
-        .login-input:focus { outline:none; border-color:hsl(var(--primary)); box-shadow:0 0 0 2px hsla(185,100%,50%,.25); }
+        .login-input { width:100%; border-radius:.7rem; background:hsl(221 40% 8% / .6); border:1px solid hsl(var(--border)); padding:.7rem .8rem; font-size:.875rem; color:hsl(var(--foreground)); transition:border-color .15s, box-shadow .15s; }
+        .login-input:focus { outline:none; border-color:hsl(var(--primary)); box-shadow:0 0 0 3px hsl(var(--primary) / .22); }
         .login-input::placeholder { color:hsl(var(--muted-foreground)); }
       `}</style>
     </div>
@@ -237,7 +237,7 @@ export default function Login() {
 function Field({ icon: Icon, label, children }) {
   return (
     <div>
-      <label className="flex items-center gap-1.5 text-[11px] font-mono uppercase tracking-wider text-muted-foreground mb-1.5"><Icon className="w-3 h-3" /> {label}</label>
+      <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground mb-1.5"><Icon className="w-3.5 h-3.5 text-primary/70" /> {label}</label>
       {children}
     </div>
   );
@@ -255,37 +255,40 @@ function SubmitBtn({ loading, disabled, children }) {
 
 function IntroPanel() {
   const features = [
-    ['📊', 'Explore seus dados', 'EDA completo: distribuições, correlações, outliers, balanceamento de classes e qualidade.'],
-    ['🤖', 'Treine modelos de verdade', 'Classificação, regressão e clustering treinados sobre todo o dataset — métricas reais, não estimativas.'],
-    ['🚀', 'Coloque em produção', 'Deploy, inferência ao vivo, testes A/B, Champion×Challenger e monitoramento de drift.'],
-    ['🔒', '100% local, sem IA externa', 'Seus dados ficam no seu navegador. Nada de LLM, nada de nuvem de terceiros.'],
+    [BarChart3, 'Explore seus dados', 'EDA completo: distribuições, correlações, outliers, balanceamento de classes e qualidade.'],
+    [Cpu, 'Treine modelos de verdade', 'Classificação, regressão e clustering treinados sobre todo o dataset — métricas reais, não estimativas.'],
+    [Rocket, 'Coloque em produção', 'Deploy, inferência ao vivo, testes A/B, Champion × Challenger e monitoramento de drift.'],
+    [ShieldCheck, '100% local, sem IA externa obrigatória', 'Seus dados ficam no seu navegador. A IA do Gemini é opcional e só entra quando você quiser.'],
   ];
   return (
     <div className="hidden lg:flex flex-col justify-center px-12 xl:px-20 py-12 relative">
-      <div className="pointer-events-none absolute right-6 top-10 opacity-[0.06]"><ModaraLogoMark size={220} /></div>
-      <div className="relative">
-        <div className="flex items-center gap-3 mb-6">
-          <ModaraLogoMark size={48} />
-          <div>
-            <h1 className="font-display font-extrabold text-2xl tracking-[0.28em] text-gradient-primary leading-none">NEURIX</h1>
-            <p className="text-[9px] text-primary/50 font-mono uppercase tracking-[0.3em] mt-1">ML Workbench</p>
-          </div>
+      <div className="pointer-events-none absolute right-6 top-10 opacity-[0.05]"><ModaraLogoMark size={240} /></div>
+      <div className="relative max-w-lg">
+        <div className="flex items-center gap-3 mb-8">
+          <ModaraLogoMark size={44} />
+          <span className="font-display font-bold text-xl tracking-tight text-gradient-primary leading-none">Neurix</span>
+          <span className="text-[11px] text-muted-foreground border-l border-border/60 pl-3">Workbench de machine learning</span>
         </div>
-        <h2 className="text-2xl xl:text-3xl font-display font-bold text-foreground leading-tight mb-3">
-          Da base de dados ao modelo em produção, <span className="text-gradient-primary">sem escrever código.</span>
+
+        <h2 className="font-display text-3xl xl:text-[2.6rem] font-bold text-foreground leading-[1.08] mb-4">
+          Da base de dados ao modelo em produção,<br />
+          <span className="text-gradient-primary">sem escrever uma linha de código.</span>
         </h2>
-        <p className="text-sm text-muted-foreground max-w-md mb-8 leading-relaxed">
-          O Neurix é uma workbench de Machine Learning inspirada no WEKA: você sobe um dataset (CSV/Excel),
-          explora, treina modelos clássicos de verdade e acompanha tudo — de forma visual, guiada e transparente.
-          Ideal para estudo, prototipagem e análise de dados.
+        <p className="text-sm text-muted-foreground leading-relaxed mb-9">
+          Inspirado no WEKA: suba um CSV ou Excel, explore, trate os dados, treine modelos clássicos de verdade
+          e acompanhe tudo de forma visual, guiada e transparente — do primeiro gráfico ao monitoramento em produção.
         </p>
-        <div className="space-y-4 max-w-md">
-          {features.map(([emoji, title, desc]) => (
-            <div key={title} className="flex gap-3">
-              <div className="w-9 h-9 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-lg flex-shrink-0">{emoji}</div>
-              <div>
+
+        <div className="space-y-3.5">
+          {features.map(([Icon, title, desc]) => (
+            <div key={title} className="flex gap-3.5 items-start">
+              <div className="w-10 h-10 rounded-xl grid place-items-center flex-shrink-0 text-primary
+                              bg-gradient-to-br from-primary/15 to-accent/10 border border-primary/20">
+                <Icon className="w-5 h-5" strokeWidth={1.75} />
+              </div>
+              <div className="pt-0.5">
                 <p className="text-sm font-semibold text-foreground">{title}</p>
-                <p className="text-xs text-muted-foreground leading-snug">{desc}</p>
+                <p className="text-xs text-muted-foreground leading-snug mt-0.5">{desc}</p>
               </div>
             </div>
           ))}

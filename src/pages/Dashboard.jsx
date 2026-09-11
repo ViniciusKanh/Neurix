@@ -70,18 +70,19 @@ export default function Dashboard() {
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-5">
       {/* Hero */}
       <div className="relative overflow-hidden rounded-2xl border border-primary/20 glass-strong hud-corners">
-        <div className="pointer-events-none absolute inset-0 bg-grid-pattern opacity-40" />
-        <div className="pointer-events-none absolute -right-10 -top-16 w-72 h-72 rounded-full bg-primary/15 blur-[90px]" />
-        <div className="pointer-events-none absolute right-6 top-1/2 -translate-y-1/2 opacity-[0.07] hidden md:block"><ModaraLogoMark size={200} /></div>
+        <div className="pointer-events-none absolute inset-0 bg-grid-pattern opacity-25" />
+        <div className="pointer-events-none absolute -right-10 -top-16 w-80 h-80 rounded-full bg-primary/12 blur-[100px]" />
+        <div className="pointer-events-none absolute right-6 top-1/2 -translate-y-1/2 opacity-[0.06] hidden md:block"><ModaraLogoMark size={210} /></div>
         <div className="relative p-6 sm:p-8">
-          <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-primary/60 flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" /> Painel · Neurix
+          <p className="text-xs text-muted-foreground flex items-center gap-2">
+            <span className="relative flex w-1.5 h-1.5"><span className="absolute inset-0 rounded-full bg-accent animate-ping opacity-60" /><span className="relative w-1.5 h-1.5 rounded-full bg-accent" /></span>
+            Seu painel
           </p>
-          <h1 className="mt-2 text-2xl sm:text-3xl font-display font-extrabold tracking-tight">
-            {greeting}{firstName ? ', ' : ''}<span className="text-gradient-primary">{firstName}</span> 👋
+          <h1 className="mt-2 text-3xl sm:text-4xl font-display font-bold tracking-tight leading-none">
+            {greeting}{firstName ? ', ' : ''}<span className="text-gradient-primary">{firstName || 'de volta'}</span>
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground max-w-lg">
-            Sua workbench de Machine Learning 100% local. {projects.length ? `${projects.length} projeto(s), ${models.length} modelo(s) treinado(s).` : 'Comece criando seu primeiro projeto.'}
+          <p className="mt-2.5 text-sm text-muted-foreground max-w-lg">
+            Sua workbench de machine learning, 100% local. {projects.length ? `${projects.length} projeto${projects.length > 1 ? 's' : ''} · ${models.length} modelo${models.length !== 1 ? 's' : ''} treinado${models.length !== 1 ? 's' : ''}.` : 'Comece criando seu primeiro projeto.'}
           </p>
           <div className="mt-5 flex flex-wrap items-center gap-3">
             <Link to="/projects/new" className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary to-accent text-primary-foreground font-bold py-2.5 px-5 text-sm hover:opacity-90 glow-primary">
@@ -129,17 +130,17 @@ export default function Dashboard() {
         {kpis.map((k, i) => (
           <motion.div key={k.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
             <Link to={k.to}>
-              <div className="group relative overflow-hidden rounded-xl glass border border-border/60 p-4 hover:border-primary/40 transition-all h-full">
-                <div className="pointer-events-none absolute -right-6 -bottom-6 w-20 h-20 rounded-full bg-primary/5 group-hover:bg-primary/10 blur-xl transition" />
+              <div className="group relative overflow-hidden rounded-xl glass surface-raised border border-border/60 p-4 hover:border-primary/40 transition-colors h-full">
+                <div className="pointer-events-none absolute -right-6 -bottom-6 w-24 h-24 rounded-full bg-primary/5 group-hover:bg-primary/12 blur-xl transition" />
                 <div className="flex items-center justify-between">
-                  <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${k.grad} flex items-center justify-center text-primary-foreground shadow-lg`}>
+                  <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${k.grad} grid place-items-center text-primary-foreground shadow-[0_8px_20px_-8px_hsl(var(--primary)/0.6)]`}>
                     <k.icon className="w-5 h-5" />
                   </div>
                   <ArrowRight className="w-4 h-4 text-muted-foreground/50 group-hover:text-primary group-hover:translate-x-0.5 transition" />
                 </div>
-                <p className="mt-3 text-3xl font-bold font-mono tracking-tight text-foreground">{k.value}</p>
+                <p className="mt-3 font-display text-3xl font-bold tracking-tight text-foreground tabular-nums">{k.value}</p>
                 <p className="text-xs text-foreground/80">{k.label}</p>
-                <p className="text-[10px] text-primary/60">{k.sub}</p>
+                <p className="text-[10px] text-primary/70">{k.sub}</p>
               </div>
             </Link>
           </motion.div>
