@@ -113,6 +113,7 @@ export const settingsApi = {
 export const aiApi = {
   status: () => api('/ai/status'),
   analyze: (profile) => api('/ai/analyze', { method: 'POST', body: { profile } }),
+  interpret: (context) => api('/ai/interpret', { method: 'POST', body: { context } }),
 };
 
 // ---- Full dataset rows (real training) -----------------------------------

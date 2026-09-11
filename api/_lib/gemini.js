@@ -46,55 +46,84 @@ function buildPrompt(profile) {
   }).join('\n');
   const sample = JSON.stringify((profile.sample || []).slice(0, 12));
 
-  return `Você é um especialista em mineração de dados e engenharia de atributos (feature engineering).
-Analise o dataset descrito abaixo e proponha melhorias de PRÉ-PROCESSAMENTO e NOVAS FEATURES.
+  return `Você é um cientista de dados sênior, especialista em mineração de dados, pré-processamento e engenharia de atributos. Seja concreto, técnico e específico para ESTE dataset — nada de conselhos genéricos.
 
-Contexto do dataset:
+DATASET
 - Linhas: ${profile.rows}
-- Coluna-alvo sugerida pelo usuário: ${profile.target || 'não informada'}
-- Tarefa pretendida: ${profile.task || 'não informada'}
+- Coluna-alvo sugerida pelo usuário: ${profile.target || 'não informada — sugira a melhor'}
+- Tarefa pretendida: ${profile.task || 'não informada — recomende a melhor'}
 
-Colunas:
+COLUNAS (nome (tipo[, papel]) · nulos% · únicos · stats):
 ${cols}
 
-Amostra (até 12 linhas): ${sample}
+AMOSTRA (até 12 linhas): ${sample}
 
-Regras OBRIGATÓRIAS para as features sugeridas:
-- Use SOMENTE os nomes de colunas existentes acima.
-- "transform" deve ser um de: ${SUPPORTED_TRANSFORMS}.
-- Para transform="formula": preencha "formula" usando APENAS os operadores + - * / % ^ ( ) e as funções log, ln, sqrt, abs, exp, min, max, com nomes de colunas. Ex.: "renda / (idade + 1)".
-- Para transform diferente de formula: preencha "source_column" com a coluna de origem. Em "binning" use params {"bins": N, "method": "width|freq"}; em "scale" use params {"method": "zscore|minmax"}.
-- Proponha de 3 a 8 features realmente úteis, cada uma com justificativa curta e benefício esperado.
-- Escreva tudo em português do Brasil. Não invente colunas nem valores.`;
+O QUE PRODUZIR (pense como se fosse preparar estes dados para modelagem):
+1) dataset_summary: 2-4 frases descrevendo o que o dataset parece representar, sua qualidade geral e o potencial analítico.
+2) possible_actions: 3-6 coisas concretas que dá para FAZER com estes dados. Para cada uma: "type" ∈ ["análise","modelo","negócio"], "action" (o que fazer) e "how" (como/por quê, citando colunas reais).
+3) quality_issues: problemas reais (nulos altos, cardinalidade, outliers prováveis, colunas constantes/redundantes, possível vazamento de alvo, tipos inconsistentes). Cada um com "severity" ∈ ["alto","médio","baixo"] e "action" objetiva.
+4) recommended_tasks: tarefas de ML adequadas (classificação/regressão/clustering/associação) com "target" (coluna real ou "") e "reason".
+5) preprocessing_steps: lista ORDENADA (strings) do pipeline recomendado antes de treinar (tratamento de nulos, encoding, escala, remoção de vazamento, etc.).
+6) suggested_features: 4-10 NOVAS features realmente úteis para modelagem (razões, interações, agregações, indicadores, discretizações, transformações). Priorize ganho preditivo e interpretabilidade.
+
+REGRAS ESTRITAS das features (o app aplica automaticamente):
+- Use SOMENTE nomes de colunas existentes acima. Não invente colunas nem valores.
+- "transform" ∈ [${SUPPORTED_TRANSFORMS}].
+- transform="formula": "formula" usando APENAS + - * / % ^ ( ) e funções log, ln, sqrt, abs, exp, min, max, com nomes de colunas. Use para razões/interações/polinômios. Ex.: "renda / (idade + 1)".
+- demais transforms: "source_column" = coluna de origem. binning → params {"bins":N,"method":"width|freq"} (use para variáveis contínuas com relação não-linear); scale → params {"method":"zscore|minmax"} (para modelos sensíveis a escala); log → para variáveis muito assimétricas/positivas; onehot → categóricas de baixa cardinalidade; label → categóricas ordinais/alta cardinalidade.
+- Cada feature: "name" (snake_case), "rationale" (por que ajuda) e "expected_benefit".
+
+Responda APENAS com um JSON (sem markdown) exatamente neste formato:
+{"dataset_summary":"","possible_actions":[{"type":"","action":"","how":""}],"quality_issues":[{"issue":"","severity":"","action":""}],"recommended_tasks":[{"task":"","target":"","reason":""}],"preprocessing_steps":[""],"suggested_features":[{"name":"","transform":"","formula":"","source_column":"","params":{"bins":0,"method":""},"rationale":"","expected_benefit":""}]}
+Escreva tudo em português do Brasil.`;
 }
 
-const RESPONSE_SCHEMA = {
-  type: 'object',
-  properties: {
-    dataset_summary: { type: 'string' },
-    quality_issues: { type: 'array', items: { type: 'object', properties: { issue: { type: 'string' }, severity: { type: 'string', enum: ['alto', 'médio', 'baixo'] }, action: { type: 'string' } }, required: ['issue', 'action'] } },
-    recommended_tasks: { type: 'array', items: { type: 'object', properties: { task: { type: 'string' }, target: { type: 'string' }, reason: { type: 'string' } }, required: ['task', 'reason'] } },
-    suggested_features: { type: 'array', items: { type: 'object', properties: {
-      name: { type: 'string' }, rationale: { type: 'string' }, expected_benefit: { type: 'string' },
-      transform: { type: 'string', enum: ['formula', 'binning', 'onehot', 'label', 'scale', 'log'] },
-      formula: { type: 'string' }, source_column: { type: 'string' },
-      params: { type: 'object', properties: { bins: { type: 'integer' }, method: { type: 'string' } } },
-    }, required: ['name', 'transform', 'rationale'] } },
-  },
-  required: ['dataset_summary', 'suggested_features'],
-};
-
-// Calls Gemini generateContent with structured JSON output.
+// Calls Gemini generateContent with JSON output (no strict schema — more robust
+// across models and lets the model return richer content).
 export async function callGeminiAnalyze(profile) {
+  const cfg = await requireCfg();
+  const text = await generate(cfg, buildPrompt(profile), 8192);
+  const parsed = parseJson(text);
+  if (!parsed) throw new Error('Resposta do Gemini não pôde ser interpretada como JSON. Tente novamente ou troque o modelo.');
+  return { model: cfg.model, ...parsed };
+}
+
+// AI narrative interpretation of a completed ML analysis.
+export async function callGeminiInterpret(ctx) {
+  const cfg = await requireCfg();
+  const text = await generate(cfg, buildInterpretPrompt(ctx), 2048);
+  const parsed = parseJson(text) || { interpretation: text, recommendations: [] };
+  return { model: cfg.model, ...parsed };
+}
+
+function buildInterpretPrompt(ctx) {
+  return `Você é um cientista de dados explicando o resultado de um modelo para um público técnico, de forma clara e acionável.
+
+Projeto: ${ctx.project || '-'}
+Tarefa: ${ctx.task || '-'} · Coluna-alvo: ${ctx.target || '-'}
+Melhor modelo: ${ctx.best_model || '-'}
+${ctx.class_labels ? `Classes: ${ctx.class_labels.join(', ')}\n` : ''}Métricas: ${JSON.stringify(ctx.metrics || {})}
+${ctx.cross_validation ? `Validação cruzada: ${JSON.stringify(ctx.cross_validation)}\n` : ''}${ctx.feature_importance?.length ? `Features mais importantes: ${ctx.feature_importance.slice(0, 8).map((f) => f.feature).join(', ')}\n` : ''}${ctx.class_balance ? `Balanceamento: ${JSON.stringify(ctx.class_balance)}\n` : ''}
+Produza:
+- interpretation: 1 a 3 parágrafos em markdown explicando o que as métricas significam na prática, se o modelo está bom, riscos (overfitting, desbalanceamento, vazamento) e o que as features importantes indicam.
+- recommendations: 3 a 5 próximos passos concretos (melhorar dados, features, modelo, validação ou uso em produção).
+
+Responda APENAS com JSON: {"interpretation":"","recommendations":[""]}. Em português do Brasil, sem inventar números além dos fornecidos.`;
+}
+
+// ---- shared helpers ----
+async function requireCfg() {
   const cfg = await getGeminiConfig();
   if (!cfg || !cfg.api_key) { const e = new Error('Gemini não configurado. Um administrador deve cadastrar a chave em Configurações → IA.'); e.code = 'NO_KEY'; throw e; }
   if (!cfg.enabled) { const e = new Error('A integração com o Gemini está desativada. Ative em Configurações → IA.'); e.code = 'DISABLED'; throw e; }
+  return { ...cfg, model: cfg.model || 'gemini-2.0-flash' };
+}
 
-  const model = cfg.model || 'gemini-2.0-flash';
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(cfg.api_key)}`;
+async function generate(cfg, prompt, maxOutputTokens = 3072) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${cfg.model}:generateContent?key=${encodeURIComponent(cfg.api_key)}`;
   const payload = {
-    contents: [{ role: 'user', parts: [{ text: buildPrompt(profile) }] }],
-    generationConfig: { temperature: 0.4, responseMimeType: 'application/json', responseSchema: RESPONSE_SCHEMA },
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    generationConfig: { temperature: 0.4, responseMimeType: 'application/json', maxOutputTokens },
   };
   const resp = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
   if (!resp.ok) {
@@ -103,10 +132,7 @@ export async function callGeminiAnalyze(profile) {
     const e = new Error(`Falha na API do Gemini: ${msg}`); e.status = resp.status; throw e;
   }
   const data = await resp.json();
-  const text = data?.candidates?.[0]?.content?.parts?.map((p) => p.text).join('') || '';
-  const parsed = parseJson(text);
-  if (!parsed) throw new Error('Resposta do Gemini não pôde ser interpretada como JSON.');
-  return { model, ...parsed };
+  return data?.candidates?.[0]?.content?.parts?.map((p) => p.text).join('') || '';
 }
 
 // Minimal ping to validate a candidate key/model (used by the test button).

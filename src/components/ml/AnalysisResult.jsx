@@ -1,14 +1,35 @@
-import React from 'react';
+import React, { useState } from 'react';
 import GlowCard from '@/components/ui/GlowCard';
 import StatusBadge from '@/components/ui/StatusBadge';
-import { Sparkles, TrendingUp } from 'lucide-react';
+import { Sparkles, TrendingUp, Loader2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { aiApi } from '@/api/base44Client';
+import { toast } from 'sonner';
 
 export default function AnalysisResult({ analysis }) {
   const results = analysis.results || {};
   const featureImportance = results.feature_importance || [];
   const modelsComparison = results.models_comparison || [];
+  const [aiText, setAiText] = useState(null);
+  const [aiRecs, setAiRecs] = useState([]);
+  const [aiLoading, setAiLoading] = useState(false);
+
+  const interpretWithAI = async () => {
+    setAiLoading(true);
+    try {
+      const context = {
+        project: analysis.project_name, task: analysis.type, target: analysis.config?.target_column,
+        best_model: results.best_model, metrics: results.metrics, class_labels: results.class_labels,
+        cross_validation: results.cross_validation, feature_importance: featureImportance,
+        class_balance: results.class_balance,
+      };
+      const r = await aiApi.interpret(context);
+      setAiText(r.interpretation || ''); setAiRecs(r.recommendations || []);
+      toast.success('Interpretação gerada pelo Gemini.');
+    } catch (e) { toast.error(e.message || 'Falha ao interpretar. Verifique o Gemini em Configurações → IA.'); }
+    finally { setAiLoading(false); }
+  };
 
   const typeLabel = {
     classification: 'Classificação',
@@ -27,6 +48,12 @@ export default function AnalysisResult({ analysis }) {
           <p className="text-xs text-muted-foreground">{typeLabel}</p>
         </div>
         <div className="flex items-center gap-2">
+          {analysis.status === 'completed' && results.metrics && (
+            <button onClick={interpretWithAI} disabled={aiLoading}
+              className="flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full border border-primary/40 text-primary hover:bg-primary/10 transition disabled:opacity-50">
+              {aiLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />} Interpretar com IA
+            </button>
+          )}
           {results.training_mode && (
             <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${results.training_mode === 'real' ? 'bg-accent/15 text-accent' : 'bg-amber-400/15 text-amber-400'}`}>
               {results.training_mode === 'real' ? `✓ Treino real${results.trained_on ? ` · ${results.trained_on.toLocaleString('pt-BR')} linhas` : ''}` : '~ Estimativa'}
@@ -35,6 +62,26 @@ export default function AnalysisResult({ analysis }) {
           <StatusBadge status={analysis.status} />
         </div>
       </div>
+
+      {aiText && (
+        <div className="mb-4 p-4 rounded-lg bg-primary/5 border border-primary/25">
+          <p className="text-xs font-semibold text-primary flex items-center gap-1.5 mb-2"><Sparkles className="w-3.5 h-3.5" /> Interpretação por IA (Gemini)</p>
+          <div className="prose prose-sm prose-invert max-w-none">
+            <ReactMarkdown components={{
+              p: ({ children }) => <p className="text-xs text-muted-foreground mb-2 leading-relaxed">{children}</p>,
+              strong: ({ children }) => <strong className="text-foreground">{children}</strong>,
+              ul: ({ children }) => <ul className="list-disc ml-4 space-y-0.5">{children}</ul>,
+              li: ({ children }) => <li className="text-xs text-muted-foreground">{children}</li>,
+            }}>{aiText}</ReactMarkdown>
+          </div>
+          {aiRecs.length > 0 && (
+            <div className="mt-2 pt-2 border-t border-primary/15">
+              <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Próximos passos</p>
+              <ul className="space-y-1">{aiRecs.map((r, i) => <li key={i} className="text-xs text-muted-foreground flex items-start gap-1.5"><TrendingUp className="w-3 h-3 text-primary flex-shrink-0 mt-0.5" /> {r}</li>)}</ul>
+            </div>
+          )}
+        </div>
+      )}
 
       {analysis.status === 'completed' && (
         <div className="space-y-4">

@@ -35,6 +35,7 @@ export default function AIAdvisor() {
   const [dsState, setDsState] = useState('none'); // none|loading|ready|missing
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState(null);
+  const [error, setError] = useState(null);
 
   // working copy for applied features
   const [working, setWorking] = useState(null);
@@ -58,14 +59,17 @@ export default function AIAdvisor() {
   const currentCols = useMemo(() => (working?.length ? Object.keys(working[0]) : cols), [working, cols]);
 
   const analyze = async () => {
-    if (!rows) return;
-    setRunning(true); setResult(null);
+    if (!rows || !rows.length) { toast.error('Selecione um projeto com dataset neste dispositivo.'); return; }
+    setRunning(true); setResult(null); setError(null);
     try {
       const profile = buildProfile(rows, project?.column_info, { target: target === '__none__' ? '' : target, task: task === '__none__' ? '' : task });
       const r = await aiApi.analyze(profile);
+      if (!r || (!r.suggested_features && !r.dataset_summary)) throw new Error('O Gemini respondeu, mas sem conteúdo utilizável. Tente novamente ou troque o modelo em Configurações → IA.');
       setResult(r);
       toast.success('Análise concluída pelo Gemini.');
     } catch (e) {
+      console.error('[AIAdvisor] analyze falhou:', e);
+      setError(e.message || 'Falha ao analisar. Verifique a chave do Gemini em Configurações → IA e o deploy da API.');
       toast.error(e.message || 'Falha ao analisar.');
     } finally { setRunning(false); }
   };
@@ -138,7 +142,7 @@ export default function AIAdvisor() {
             </Select>
           </div>
           <div className="flex items-end">
-            <Button onClick={analyze} disabled={dsState !== 'ready' || running || notReady} className="w-full bg-primary text-primary-foreground hover:bg-primary/90 glow-primary">
+            <Button onClick={analyze} disabled={dsState !== 'ready' || running} className="w-full bg-primary text-primary-foreground hover:bg-primary/90 glow-primary">
               {running ? <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> Analisando…</> : <><Wand2 className="w-4 h-4 mr-1.5" /> Analisar com IA</>}
             </Button>
           </div>
@@ -160,8 +164,21 @@ export default function AIAdvisor() {
         </GlowCard>
       )}
 
+      {error && !running && (
+        <GlowCard className="mb-4 border-destructive/40 bg-destructive/5">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-destructive">Não foi possível concluir a análise</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{error}</p>
+              <p className="text-[11px] text-muted-foreground mt-2">Verifique: (1) a chave e o modelo em Configurações → IA (botão “Testar chave”); (2) se a integração está <strong>Habilitada</strong>; (3) se o app foi reimplantado após adicionar o endpoint <code>/api/ai</code>.</p>
+            </div>
+          </div>
+        </GlowCard>
+      )}
+
       {!result && !running ? (
-        <EmptyState icon={Sparkles} title="Nenhuma análise ainda" description="Selecione um projeto e clique em Analisar com IA para receber um diagnóstico e sugestões de features." />
+        <EmptyState icon={Sparkles} title="Nenhuma análise ainda" description="Selecione um projeto e clique em Analisar com IA para receber um diagnóstico, ações possíveis e sugestões de features." />
       ) : result && (
         <div className="space-y-4">
           {/* Diagnosis hero */}
@@ -170,6 +187,40 @@ export default function AIAdvisor() {
             <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-primary/60 mb-2 flex items-center gap-2"><Sparkles className="w-3.5 h-3.5" /> Diagnóstico · {result.model}</p>
             <p className="text-base sm:text-lg text-foreground leading-relaxed font-display max-w-3xl">{result.dataset_summary}</p>
           </div>
+
+          {/* Possible actions — what you can do with this dataset */}
+          {result.possible_actions?.length > 0 && (
+            <GlowCard>
+              <h3 className="font-semibold text-sm mb-3 flex items-center gap-2"><Lightbulb className="w-4 h-4 text-primary" /> O que você pode fazer com estes dados</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {result.possible_actions.map((a, i) => {
+                  const tone = a.type === 'modelo' ? 'hsl(265,70%,64%)' : a.type === 'negócio' ? 'hsl(152,68%,52%)' : 'hsl(187,92%,55%)';
+                  return (
+                    <div key={i} className="rounded-lg bg-secondary/25 p-3 border-t-2" style={{ borderColor: tone }}>
+                      <span className="text-[9px] uppercase tracking-wide font-semibold" style={{ color: tone }}>{a.type || 'ação'}</span>
+                      <p className="text-xs font-semibold text-foreground mt-0.5">{a.action}</p>
+                      <p className="text-[11px] text-muted-foreground mt-1">{a.how}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </GlowCard>
+          )}
+
+          {/* Recommended preprocessing pipeline */}
+          {result.preprocessing_steps?.length > 0 && (
+            <GlowCard>
+              <h3 className="font-semibold text-sm mb-3 flex items-center gap-2"><ArrowRight className="w-4 h-4 text-primary" /> Pipeline de pré-processamento recomendado</h3>
+              <ol className="space-y-1.5">
+                {result.preprocessing_steps.map((s, i) => (
+                  <li key={i} className="flex items-start gap-2.5 text-xs text-muted-foreground">
+                    <span className="w-5 h-5 rounded-full bg-primary/15 text-primary text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">{i + 1}</span>
+                    <span className="pt-0.5">{s}</span>
+                  </li>
+                ))}
+              </ol>
+            </GlowCard>
+          )}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Quality issues */}

@@ -565,7 +565,7 @@ export async function aiHandler(req, res, ctx) {
   const me = await currentUserRow(req);
   if (!me) return bad(res, 401, 'Não autenticado');
   const { segments, method, body } = ctx;
-  const { getGeminiConfig, maskGeminiConfig, callGeminiAnalyze } = await import('./gemini.js');
+  const { getGeminiConfig, maskGeminiConfig, callGeminiAnalyze, callGeminiInterpret } = await import('./gemini.js');
 
   // GET /api/ai/status -> { configured, enabled, model } (no key exposed)
   if (segments[0] === 'status' && method === 'GET') {
@@ -578,6 +578,18 @@ export async function aiHandler(req, res, ctx) {
     if (!body?.profile?.columns?.length) return bad(res, 400, 'Perfil do dataset ausente.');
     try {
       const result = await callGeminiAnalyze(body.profile);
+      return json(res, 200, result);
+    } catch (e) {
+      const status = e.code === 'NO_KEY' || e.code === 'DISABLED' ? 400 : (e.status || 500);
+      return bad(res, status, e.message);
+    }
+  }
+
+  // POST /api/ai/interpret { context } -> narrative interpretation of an analysis
+  if (segments[0] === 'interpret' && method === 'POST') {
+    if (!body?.context) return bad(res, 400, 'Contexto da análise ausente.');
+    try {
+      const result = await callGeminiInterpret(body.context);
       return json(res, 200, result);
     } catch (e) {
       const status = e.code === 'NO_KEY' || e.code === 'DISABLED' ? 400 : (e.status || 500);
