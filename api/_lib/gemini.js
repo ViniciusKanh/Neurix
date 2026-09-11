@@ -111,7 +111,7 @@ export async function callGeminiAnalyze(profile) {
 // AI narrative interpretation of a completed ML analysis.
 export async function callGeminiInterpret(ctx) {
   const cfg = await requireCfg();
-  const text = await generate(cfg, buildInterpretPrompt(ctx), 2048);
+  const text = await generate(cfg, buildInterpretPrompt(ctx), 4096);
   const parsed = parseJson(text) || { interpretation: text, recommendations: [] };
   return { model: cfg.model, ...parsed };
 }

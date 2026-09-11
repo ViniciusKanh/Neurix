@@ -10,7 +10,7 @@ import EmptyState from '@/components/ui/EmptyState';
 import { motion } from 'framer-motion';
 import {
   Sparkles, Wand2, Loader2, Save, Plus, Check, AlertTriangle, Lightbulb,
-  ArrowRight, Settings2,
+  ArrowRight, Settings2, Download, FileSpreadsheet,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/AuthContext';
@@ -20,6 +20,7 @@ import { applySuggestion, validateSuggestion, transformLabel } from '@/lib/aiFea
 import { correlationMatrix, detectTargetLeakage } from '@/lib/dataQuality';
 import { classBalance } from '@/lib/realML';
 import { getAI, saveAI } from '@/lib/aiCache';
+import { exportRowsToExcel, exportRowsToCSV, excelName, csvName } from '@/lib/exportDataset';
 
 // transform family → accent color (encodes the kind of engineering move)
 const FAMILY = {
@@ -118,6 +119,15 @@ export default function AIAdvisor() {
     if (!res.added.length) return toast.error('A transformação não gerou colunas.');
     setWorking(res.rows); setAppliedNames((a) => [...new Set([...a, ...res.added])]); setAppliedLog((l) => [...l, res.report]);
     toast.success(`Feature aplicada: ${res.added.join(', ')}`);
+  };
+
+  const exportExcel = async () => {
+    try { await exportRowsToExcel(working, excelName(`${project?.name || 'dataset'}_features`)); toast.success('Excel exportado — pronto para reimportar.'); }
+    catch (e) { toast.error(e.message); }
+  };
+  const exportCsv = () => {
+    try { exportRowsToCSV(working, csvName(`${project?.name || 'dataset'}_features`)); toast.success('CSV exportado.'); }
+    catch (e) { toast.error(e.message); }
   };
 
   const saveWorking = async () => {
@@ -313,9 +323,11 @@ export default function AIAdvisor() {
               <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                 <h3 className="font-semibold text-sm flex items-center gap-2"><Sparkles className="w-4 h-4 text-primary" /> Features sugeridas</h3>
                 {appliedNames.length > 0 && (
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="text-[11px] text-accent">{appliedNames.length} aplicada(s)</span>
-                    <Button size="sm" onClick={saveWorking} disabled={saving} className="bg-accent text-accent-foreground hover:bg-accent/90">{saving ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-1.5" />} Salvar no dataset</Button>
+                    <Button size="sm" variant="outline" onClick={exportExcel} className="border-emerald-400/40 text-emerald-400 hover:bg-emerald-400/10"><FileSpreadsheet className="w-3.5 h-3.5 mr-1.5" /> Excel</Button>
+                    <Button size="sm" variant="outline" onClick={exportCsv} className="border-primary/40 text-primary hover:bg-primary/10"><Download className="w-3.5 h-3.5 mr-1.5" /> CSV</Button>
+                    <Button size="sm" onClick={saveWorking} disabled={saving} className="bg-accent text-accent-foreground hover:bg-accent/90">{saving ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-1.5" />} Salvar no app</Button>
                   </div>
                 )}
               </div>

@@ -12,9 +12,14 @@ export default function AnalysisResult({ analysis }) {
   const modelsComparison = results.models_comparison || [];
 
   const aiContext = () => ({
+    kind: 'resultado de um modelo de machine learning (inclui importância de variáveis estilo SHAP)',
     project: analysis.project_name, task: analysis.type, target: analysis.config?.target_column,
     best_model: results.best_model, metrics: results.metrics, class_labels: results.class_labels,
-    cross_validation: results.cross_validation, feature_importance: featureImportance,
+    cross_validation: results.cross_validation,
+    feature_importance: featureImportance.slice(0, 12),
+    // Permutation importance = a SHAP-like, model-agnostic global importance.
+    permutation_importance: results.permutation_importance?.importances?.slice(0, 12),
+    models_comparison: (results.models_comparison || []).slice(0, 6).map((m) => ({ name: m.name, metrics: m.metrics })),
     class_balance: results.class_balance,
   });
 

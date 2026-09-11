@@ -7,14 +7,16 @@ import GlowCard from '@/components/ui/GlowCard';
 import EmptyState from '@/components/ui/EmptyState';
 import { IdCard, Download, Loader2, ShieldCheck, AlertTriangle, Code2 } from 'lucide-react';
 import { getDataset } from '@/lib/datasetStore';
-import { crossValidate, classBalance } from '@/lib/realML';
+import { crossValidate, classBalance, permutationImportance } from '@/lib/realML';
 import { buildModelCard, buildModelBundle, downloadJSON, exportSklearn, downloadText } from '@/lib/governance';
+import AIInsight from '@/components/ai/AIInsight';
 import { toast } from 'sonner';
 
 export default function ModelCardView({ projects = [] }) {
   const [projectId, setProjectId] = useState('');
   const [analysisId, setAnalysisId] = useState('');
   const [card, setCard] = useState(null);
+  const [perm, setPerm] = useState(null);
   const [busy, setBusy] = useState(false);
 
   const { data: analyses = [] } = useQuery({
@@ -29,7 +31,7 @@ export default function ModelCardView({ projects = [] }) {
 
   useEffect(() => {
     let alive = true;
-    setCard(null);
+    setCard(null); setPerm(null);
     if (!project || !analysis) return;
     (async () => {
       setBusy(true);
@@ -38,10 +40,12 @@ export default function ModelCardView({ projects = [] }) {
         const d = await getDataset(projectId);
         const target = analysis.config?.target_column;
         if (d?.rows?.length && target) {
-          if (analysis.type === 'classification') { const b = classBalance(d.rows, target); if (!b.error) extra.balance = b; }
           const modelName = analysis.results?.best_model || 'auto';
+          if (analysis.type === 'classification') { const b = classBalance(d.rows, target); if (!b.error) extra.balance = b; }
           const cv = crossValidate(d.rows, target, project.column_info, analysis.type, modelName, 5);
           if (!cv.error) extra.cv = cv;
+          // Permutation importance = a SHAP-like global importance for the docs.
+          try { const pi = permutationImportance(d.rows, target, project.column_info, analysis.type, modelName); if (!pi.error) { extra.importance = pi; if (alive) setPerm(pi); } } catch { /* */ }
         }
       } catch { /* uses holdout only */ }
       if (alive) { setCard(buildModelCard(project, analysis, extra)); setBusy(false); }
@@ -87,6 +91,7 @@ export default function ModelCardView({ projects = [] }) {
       ) : busy ? (
         <div className="flex items-center gap-2 justify-center py-16 text-sm text-muted-foreground"><Loader2 className="w-4 h-4 animate-spin" /> Compondo o Model Card…</div>
       ) : card && (
+        <div className="space-y-4">
         <GlowCard>
           <div className="flex items-start justify-between gap-3 mb-4">
             <div>
@@ -152,6 +157,25 @@ export default function ModelCardView({ projects = [] }) {
 
           <p className="text-[10px] text-muted-foreground mt-3">Gerado em {new Date(card.generated_at).toLocaleString('pt-BR')}.</p>
         </GlowCard>
+
+        {/* Complete documentation written by AI (cached) */}
+        <AIInsight
+          cacheKey={`moddoc:${analysisId}`}
+          enabled={!!card}
+          title="Documentação completa do modelo por IA (Gemini)"
+          label="Gerar documentação com IA"
+          buildContext={() => ({
+            kind: 'documentação técnica COMPLETA de um modelo de machine learning: descreva o modelo, os dados, o pré-processamento, as métricas, a importância das variáveis (interpretabilidade estilo SHAP), a validação, os riscos e o uso recomendado',
+            model: card.model_name, task: card.task, target: card.target,
+            project: card.project, trained_on: card.trained_on, test_size: card.test_size,
+            classes: card.classes, features: card.features?.slice(0, 40),
+            performance: card.performance, validation: card.validation,
+            permutation_importance: (perm?.importances || card.feature_importance || []).slice(0, 12),
+            balance: card.balance, limitations: card.limitations,
+            metrics: analysis?.results?.metrics,
+          })}
+        />
+        </div>
       )}
     </div>
   );

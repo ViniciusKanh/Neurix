@@ -20,6 +20,7 @@ import {
 import { Link } from 'react-router-dom';
 import { getDataset, saveDataset } from '@/lib/datasetStore';
 import { analyzeQuality, imputeNulls, dropDuplicates, coerceTypes } from '@/lib/dataQuality';
+import AIInsight from '@/components/ai/AIInsight';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
   PieChart as RePieChart, Pie, Cell, ScatterChart, Scatter, ZAxis
@@ -525,6 +526,24 @@ export default function DataExplorer() {
             <StatCard label="Nulos > 30%" value={highNullCols.length} color={highNullCols.length > 0 ? 'text-destructive' : 'text-emerald-400'} />
             <StatCard label="Completude Média" value={`${(100 - avgNulls).toFixed(1)}%`} color={avgNulls > 20 ? 'text-amber-400' : 'text-emerald-400'} />
           </div>
+
+          {/* Optional AI pre-processing tips (cached) */}
+          <AIInsight
+            cacheKey={`explorer:${selectedProjectId}`}
+            enabled={!!project}
+            title="Dicas de pré-processamento por IA (Gemini)"
+            label="Sugerir pré-processamento com IA"
+            buildContext={() => ({
+              kind: 'preparação de dados — dê dicas práticas de PRÉ-PROCESSAMENTO (tratamento de nulos, encoding, escala, outliers, remoção de colunas problemáticas) para este dataset',
+              project: project?.name, rows: project?.dataset_size, columns_count: columns.length,
+              numeric: numericCols.length, categorical: categoricalCols.length,
+              avg_null_pct: Number(avgNulls.toFixed(1)),
+              high_null_columns: highNullCols.map((c) => ({ name: c.name, null_pct: c.null_percent })),
+              constant_columns: constantCols.map((c) => c.name),
+              high_cardinality_columns: highCardCols.map((c) => c.name),
+              columns: columns.slice(0, 40).map((c) => ({ name: c.name, type: c.type, unique: c.unique_count, null_pct: c.null_percent })),
+            })}
+          />
 
           {/* Tabs */}
           <div className="flex gap-1 bg-secondary/30 p-1 rounded-lg overflow-x-auto scrollbar-thin w-fit">

@@ -7,10 +7,11 @@ import { Input } from '@/components/ui/input';
 import PageHeader from '@/components/ui/PageHeader';
 import GlowCard from '@/components/ui/GlowCard';
 import EmptyState from '@/components/ui/EmptyState';
-import { Wand2, Plus, Save, Loader2, Undo2, Table2, Sparkles } from 'lucide-react';
+import { Wand2, Plus, Save, Loader2, Undo2, Table2, Sparkles, Download, FileSpreadsheet } from 'lucide-react';
 import { toast } from 'sonner';
 import { getDataset, saveDataset } from '@/lib/datasetStore';
 import { deriveColumn, binningColumn, oneHotColumn, labelEncodeColumn, scaleColumn, logColumn, inferColumns } from '@/lib/featureEng';
+import { exportRowsToExcel, exportRowsToCSV, excelName, csvName } from '@/lib/exportDataset';
 
 const TRANSFORMS = [
   { id: 'derive', label: 'Coluna derivada (fórmula)' },
@@ -85,6 +86,10 @@ export default function FeatureLab() {
     finally { setSaving(false); }
   };
 
+  const projName = projects.find((p) => p.id === projectId)?.name || 'dataset';
+  const exportExcel = async () => { try { await exportRowsToExcel(rows, excelName(`${projName}_features`)); toast.success('Excel exportado — pronto para reimportar.'); } catch (e) { toast.error(e.message); } };
+  const exportCsv = () => { try { exportRowsToCSV(rows, csvName(`${projName}_features`)); toast.success('CSV exportado.'); } catch (e) { toast.error(e.message); } };
+
   const previewCols = rows?.length ? Object.keys(rows[0]) : [];
 
   return (
@@ -153,8 +158,13 @@ export default function FeatureLab() {
                   {log.map((l, i) => <li key={i} className="text-[11px] text-muted-foreground flex items-start gap-1.5"><Sparkles className="w-3 h-3 text-accent flex-shrink-0 mt-0.5" /> {l}</li>)}
                 </ul>
                 <Button onClick={save} disabled={saving || !added.length} className="w-full mt-3 bg-accent text-accent-foreground hover:bg-accent/90">
-                  {saving ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-1.5" />} Salvar dataset com features
+                  {saving ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-1.5" />} Salvar no app
                 </Button>
+                <div className="grid grid-cols-2 gap-2 mt-2">
+                  <Button size="sm" variant="outline" onClick={exportExcel} className="border-emerald-400/40 text-emerald-400 hover:bg-emerald-400/10"><FileSpreadsheet className="w-3.5 h-3.5 mr-1.5" /> Excel</Button>
+                  <Button size="sm" variant="outline" onClick={exportCsv} className="border-primary/40 text-primary hover:bg-primary/10"><Download className="w-3.5 h-3.5 mr-1.5" /> CSV</Button>
+                </div>
+                <p className="text-[10px] text-muted-foreground mt-1">Baixe em Excel/CSV para reimportar como um novo projeto, ou salve no app para retreinar direto.</p>
               </div>
             )}
           </GlowCard>
