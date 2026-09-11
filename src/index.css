@@ -68,33 +68,39 @@
 
   .dark { color-scheme: dark; }
 
-  /* Optional light mode — activated by toggling `.light` on <html> */
+  /* Optional light mode — activated by toggling `.light` on <html>.
+     Soft cool "paper", deep readable accents (set per-mode by theme.js),
+     and white text on coloured fills. */
   .light {
     color-scheme: light;
-    --background: 210 40% 98%;
-    --foreground: 222 45% 12%;
+    --background: 208 30% 97%;
+    --foreground: 220 40% 15%;
     --card: 0 0% 100%;
-    --card-foreground: 222 45% 12%;
+    --card-foreground: 220 40% 15%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222 45% 12%;
-    --secondary: 210 32% 93%;
-    --secondary-foreground: 222 40% 18%;
-    --muted: 210 32% 93%;
-    --muted-foreground: 215 16% 42%;
-    --destructive: 0 72% 50%;
-    --border: 214 24% 87%;
-    --input: 214 24% 89%;
+    --popover-foreground: 220 40% 15%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 26% 92%;
+    --secondary-foreground: 220 32% 22%;
+    --muted: 210 26% 93%;
+    --muted-foreground: 216 14% 42%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 70% 48%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 214 20% 86%;
+    --input: 214 20% 88%;
     --elevated: 0 0% 100%;
-    --hairline: 214 24% 82%;
-    --glass: 210 40% 100%;
+    --hairline: 214 20% 80%;
+    --glass: 0 0% 100%;
     --glass-strong: 0 0% 100%;
-    --glass-border: 214 24% 46%;
-    --glass-highlight: 0 0% 100%;
-    --sidebar-background: 210 40% 97%;
-    --sidebar-foreground: 222 28% 28%;
-    --sidebar-accent: 210 32% 91%;
-    --sidebar-accent-foreground: 222 40% 18%;
-    --sidebar-border: 214 24% 86%;
+    --glass-border: 214 18% 60%;
+    --glass-highlight: 210 40% 100%;
+    --sidebar-background: 208 30% 96%;
+    --sidebar-foreground: 220 26% 30%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 210 26% 90%;
+    --sidebar-accent-foreground: 220 32% 22%;
+    --sidebar-border: 214 20% 85%;
   }
 
   * { border-color: hsl(var(--border)); }
@@ -208,6 +214,23 @@
       radial-gradient(52% 42% at 94% 18%, hsl(255 90% 68% / 0.10), transparent 62%),
       radial-gradient(60% 48% at 72% 100%, hsl(var(--accent) / 0.09), transparent 62%);
   }
+
+  /* ── Light-mode calmers: no neon halos, whisper-quiet backdrop ── */
+  .light .app-aurora {
+    background:
+      radial-gradient(58% 46% at 10% 4%, hsl(var(--primary) / 0.05), transparent 62%),
+      radial-gradient(52% 42% at 94% 18%, hsl(255 60% 62% / 0.035), transparent 64%),
+      radial-gradient(60% 48% at 72% 100%, hsl(var(--accent) / 0.04), transparent 64%);
+  }
+  .light .bg-grid-pattern {
+    background-image:
+      linear-gradient(hsl(220 18% 48% / 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(220 18% 48% / 0.05) 1px, transparent 1px);
+  }
+  .light .bg-scan-lines { background-image: none; }
+  .light .glow-primary, .light .glow-accent { box-shadow: 0 2px 12px -6px hsl(220 25% 35% / 0.22); }
+  .light .surface-raised { box-shadow: inset 0 1px 0 0 hsl(0 0% 100% / 0.7), 0 8px 24px -18px hsl(220 40% 30% / 0.22); }
+  .light .glass, .light .glass-strong, .light .glass-hud { backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
 
   /* Tactical accents (kept, refined) */
   .border-tactical { border: 1px solid hsl(var(--primary) / 0.25); }
