@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import GlowCard from '@/components/ui/GlowCard';
 import EmptyState from '@/components/ui/EmptyState';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import PageHeader from '@/components/ui/PageHeader';
 import { Badge } from '@/components/ui/badge';
 import {
   Brain, Play, Loader2, CheckCircle2, XCircle, RotateCw,
@@ -270,17 +271,13 @@ export default function Inference() {
   if (isLoading) return <LoadingSpinner text="Carregando análises..." />;
 
   return (
-    <div className="space-y-5">
-      {/* Header */}
-      <div>
-        <p className="text-xs text-primary/50 font-mono uppercase tracking-[0.2em] mb-0.5">[ inference ]</p>
-        <h1 className="text-2xl md:text-3xl font-display font-bold tracking-tight mb-1">
-          <span className="text-gradient-primary">Inferência & Retreinamento</span>
-        </h1>
-        <p className="text-sm text-muted-foreground max-w-xl">
-          Use uma análise de classificação ou regressão para prever novos dados e retreine o modelo com seu feedback
-        </p>
-      </div>
+    <div>
+      <PageHeader
+        title="Inferência & Retreino"
+        subtitle="Preveja novos dados com um modelo treinado e retreine com o seu feedback"
+        icon={Brain}
+      />
+      <div className="space-y-5">
 
       {/* Analysis Selector */}
       <GlowCard className="p-4">
@@ -531,6 +528,7 @@ export default function Inference() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

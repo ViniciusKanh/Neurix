@@ -165,9 +165,9 @@
   /* Calm ambient aurora — the app canvas backdrop */
   .app-aurora {
     background:
-      radial-gradient(60% 45% at 12% 8%, hsl(var(--primary) / 0.09), transparent 60%),
-      radial-gradient(50% 40% at 92% 22%, hsl(255 90% 66% / 0.07), transparent 60%),
-      radial-gradient(55% 45% at 70% 98%, hsl(var(--accent) / 0.06), transparent 60%);
+      radial-gradient(58% 46% at 10% 4%, hsl(var(--primary) / 0.13), transparent 60%),
+      radial-gradient(52% 42% at 94% 18%, hsl(255 90% 68% / 0.10), transparent 62%),
+      radial-gradient(60% 48% at 72% 100%, hsl(var(--accent) / 0.09), transparent 62%);
   }
 
   /* Tactical accents (kept, refined) */

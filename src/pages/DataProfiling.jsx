@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { getDataset } from '@/lib/datasetStore';
 import { correlationMatrix } from '@/lib/dataQuality';
 import AIInsight from '@/components/ai/AIInsight';
+import PageHeader from '@/components/ui/PageHeader';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import {
@@ -457,27 +458,16 @@ export default function DataProfiling() {
   })) || [];
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="relative overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-r from-card via-card/80 to-primary/5 p-6">
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl" />
-          <div className="absolute bottom-0 left-0 w-48 h-48 bg-accent/5 rounded-full blur-3xl" />
-        </div>
-        <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <div className="w-8 h-8 rounded-lg bg-primary/20 border border-primary/30 flex items-center justify-center">
-                <Eye className="w-4 h-4 text-primary" />
-              </div>
-              <h1 className="text-xl font-bold text-foreground">Perfilamento de Dados</h1>
-            </div>
-            <p className="text-sm text-muted-foreground">Análise estatística automatizada · histogramas · correlações · outliers</p>
-          </div>
+    <div>
+      <PageHeader
+        title="Perfilamento de Dados"
+        subtitle="Estatísticas, distribuições, correlações e outliers do seu dataset"
+        icon={Eye}
+        actions={
           <div className="w-full sm:w-64">
             <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
               <SelectTrigger className="h-9 text-xs bg-secondary/60 border-border/60">
-                <SelectValue placeholder="Selecione um projeto..." />
+                <SelectValue placeholder="Selecione um projeto…" />
               </SelectTrigger>
               <SelectContent>
                 {projectsWithData.length === 0 && (
@@ -489,8 +479,8 @@ export default function DataProfiling() {
               </SelectContent>
             </Select>
           </div>
-        </div>
-      </div>
+        }
+      />
 
       {!selectedProjectId ? (
         <div className="text-center py-20 border border-dashed border-border/40 rounded-2xl">
@@ -499,7 +489,7 @@ export default function DataProfiling() {
           <p className="text-xs text-muted-foreground/60 mt-1">O sistema irá analisar automaticamente todas as colunas do dataset</p>
         </div>
       ) : (
-        <>
+        <div className="space-y-6">
           {/* Summary KPIs */}
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
             {[
@@ -657,7 +647,7 @@ export default function DataProfiling() {
               </motion.div>
             )}
           </AnimatePresence>
-        </>
+        </div>
       )}
     </div>
   );

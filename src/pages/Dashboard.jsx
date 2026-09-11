@@ -213,13 +213,14 @@ export default function Dashboard() {
 
       {/* Quick actions */}
       <div>
-        <p className="text-xs text-muted-foreground font-mono uppercase tracking-wider mb-3">Ações rápidas</p>
+        <h3 className="text-sm font-semibold text-foreground mb-3">Ações rápidas</h3>
         <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-10 gap-2.5">
           {quick.map((q) => (
             <Link key={q.to} to={q.to}>
-              <motion.div whileHover={{ y: -3 }} className="flex flex-col items-center gap-2 p-3 rounded-xl border border-border/40 bg-card/50 hover:border-primary/50 hover:bg-primary/5 hover:text-primary text-muted-foreground transition-all cursor-pointer h-full">
-                <q.icon className="w-5 h-5" />
-                <span className="text-[10px] font-medium text-center leading-tight">{q.label}</span>
+              <motion.div whileHover={{ y: -3 }}
+                className="group flex flex-col items-center gap-2 p-3 rounded-xl border border-border/50 bg-card/50 surface-raised hover:border-primary/45 hover:bg-primary/5 transition-colors cursor-pointer h-full">
+                <q.icon className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                <span className="text-[10px] font-medium text-center leading-tight text-muted-foreground group-hover:text-foreground transition-colors">{q.label}</span>
               </motion.div>
             </Link>
           ))}
