@@ -371,27 +371,19 @@ export default function MLStudio() {
 
   return (
     <div>
-      <PageHeader title="ML Studio" subtitle="Treine, avalie e compare modelos de machine learning" />
-
-      {/* Project selector */}
-      <GlowCard className="mb-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <Label className="text-xs text-muted-foreground whitespace-nowrap">Projeto Ativo:</Label>
+      <PageHeader
+        title="ML Studio"
+        subtitle={project ? `${project.name} · ${project.dataset_size?.toLocaleString('pt-BR')} linhas · ${project.dataset_columns} colunas` : 'Treine, avalie e compare modelos de machine learning'}
+        icon={Brain}
+        actions={
           <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
-            <SelectTrigger className="bg-secondary/50 w-full sm:w-72">
-              <SelectValue placeholder="Selecione um projeto com dataset" />
-            </SelectTrigger>
+            <SelectTrigger className="bg-secondary/50 w-full sm:w-64"><SelectValue placeholder="Selecione um projeto" /></SelectTrigger>
             <SelectContent>
               {projectsWithData.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
             </SelectContent>
           </Select>
-          {project && (
-            <span className="text-xs text-muted-foreground">
-              {project.dataset_size?.toLocaleString('pt-BR')} linhas · {project.dataset_columns} colunas
-            </span>
-          )}
-        </div>
-      </GlowCard>
+        }
+      />
 
       {/* Local dataset missing — WEKA-style reload */}
       {selectedProjectId && localOk === false && (

@@ -34,4 +34,21 @@ export function applyTheme(id) {
 // Call once on startup, before render, to avoid a flash of the default color.
 export function initTheme() {
   applyTheme(getThemeId());
+  applyMode(getMode());
+}
+
+// ---- Light / dark mode -----------------------------------------------------
+const MODE_KEY = 'neurix_mode';
+
+export function getMode() {
+  try { return localStorage.getItem(MODE_KEY) === 'light' ? 'light' : 'dark'; } catch { return 'dark'; }
+}
+
+export function applyMode(mode) {
+  const m = mode === 'light' ? 'light' : 'dark';
+  const root = document.documentElement;
+  root.classList.toggle('light', m === 'light');
+  root.classList.toggle('dark', m === 'dark');
+  try { localStorage.setItem(MODE_KEY, m); } catch { /* ignore */ }
+  return m;
 }

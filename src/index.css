@@ -42,6 +42,12 @@
     --elevated: 221 40% 9%;
     --hairline: 211 28% 20%;
 
+    /* Glass tokens (mode-aware) */
+    --glass: 221 40% 8%;
+    --glass-strong: 221 44% 7%;
+    --glass-border: 210 30% 60%;
+    --glass-highlight: 0 0% 100%;
+
     --chart-1: 187 92% 52%;
     --chart-2: 160 84% 46%;
     --chart-3: 255 90% 70%;
@@ -61,6 +67,35 @@
   }
 
   .dark { color-scheme: dark; }
+
+  /* Optional light mode — activated by toggling `.light` on <html> */
+  .light {
+    color-scheme: light;
+    --background: 210 40% 98%;
+    --foreground: 222 45% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 45% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 45% 12%;
+    --secondary: 210 32% 93%;
+    --secondary-foreground: 222 40% 18%;
+    --muted: 210 32% 93%;
+    --muted-foreground: 215 16% 42%;
+    --destructive: 0 72% 50%;
+    --border: 214 24% 87%;
+    --input: 214 24% 89%;
+    --elevated: 0 0% 100%;
+    --hairline: 214 24% 82%;
+    --glass: 210 40% 100%;
+    --glass-strong: 0 0% 100%;
+    --glass-border: 214 24% 46%;
+    --glass-highlight: 0 0% 100%;
+    --sidebar-background: 210 40% 97%;
+    --sidebar-foreground: 222 28% 28%;
+    --sidebar-accent: 210 32% 91%;
+    --sidebar-accent-foreground: 222 40% 18%;
+    --sidebar-border: 214 24% 86%;
+  }
 
   * { border-color: hsl(var(--border)); }
 
@@ -94,22 +129,22 @@
 }
 
 @layer utilities {
-  /* Glass panels — subtle top highlight for real depth */
+  /* Glass panels — subtle top highlight for real depth (mode-aware) */
   .glass {
     background:
-      linear-gradient(180deg, hsla(0,0%,100%,0.03), hsla(0,0%,100%,0) 40%),
-      hsla(221, 40%, 8%, 0.6);
+      linear-gradient(180deg, hsl(var(--glass-highlight) / 0.03), transparent 40%),
+      hsl(var(--glass) / 0.6);
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
-    border: 1px solid hsla(210, 30%, 60%, 0.10);
+    border: 1px solid hsl(var(--glass-border) / 0.10);
   }
   .glass-strong {
     background:
-      linear-gradient(180deg, hsla(0,0%,100%,0.04), hsla(0,0%,100%,0) 45%),
-      hsla(221, 44%, 7%, 0.86);
+      linear-gradient(180deg, hsl(var(--glass-highlight) / 0.04), transparent 45%),
+      hsl(var(--glass-strong) / 0.86);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    border: 1px solid hsla(210, 30%, 62%, 0.14);
+    border: 1px solid hsl(var(--glass-border) / 0.14);
   }
   .glass-hud {
     background: hsla(222, 46%, 5%, 0.72);
@@ -162,6 +197,10 @@
     background-image: radial-gradient(hsl(var(--primary) / 0.05) 1px, transparent 1px);
     background-size: 26px 26px;
   }
+  /* Edge vignette that focuses the centre — adapts to light/dark */
+  .app-vignette { background: radial-gradient(120% 80% at 50% 0%, transparent 55%, hsl(222 50% 3% / 0.55) 100%); }
+  .light .app-vignette { background: radial-gradient(120% 82% at 50% 0%, transparent 62%, hsl(214 30% 62% / 0.18) 100%); }
+
   /* Calm ambient aurora — the app canvas backdrop */
   .app-aurora {
     background:

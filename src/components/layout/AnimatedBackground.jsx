@@ -74,9 +74,8 @@ export default function AnimatedBackground() {
       <div className="fixed inset-0 pointer-events-none z-0 app-aurora" aria-hidden />
       <div className="fixed inset-0 pointer-events-none z-0 bg-grid-pattern opacity-70" aria-hidden />
       <canvas ref={canvasRef} className="fixed inset-0 pointer-events-none z-0" style={{ opacity: 0.5 }} aria-hidden />
-      {/* Soft vignette to focus the eye toward the centre content */}
-      <div className="fixed inset-0 pointer-events-none z-0" aria-hidden
-        style={{ background: 'radial-gradient(120% 80% at 50% 0%, transparent 55%, hsl(222 50% 3% / 0.55) 100%)' }} />
+      {/* Soft vignette to focus the eye toward the centre content (mode-aware) */}
+      <div className="fixed inset-0 pointer-events-none z-0 app-vignette" aria-hidden />
     </>
   );
 }

@@ -7,7 +7,8 @@ import {
   KeyRound, ShieldCheck, ShieldOff, Palette, Mail, Send, Sparkles,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { THEMES, applyTheme, getThemeId } from '@/lib/theme';
+import { THEMES, applyTheme, getThemeId, getMode, applyMode } from '@/lib/theme';
+import { Moon, Sun } from 'lucide-react';
 import { ModaraLogoMark } from '@/components/layout/ModaraLogo';
 
 const BASE_TABS = [
@@ -162,11 +163,34 @@ function ProfileTab({ user, setUser, refreshUser }) {
 // ---------------------------------------------------------------- Appearance
 function AppearanceTab() {
   const [current, setCurrent] = useState(getThemeId());
+  const [mode, setMode] = useState(getMode());
 
   const choose = (id) => { applyTheme(id); setCurrent(id); toast.success('Aparência atualizada'); };
+  const chooseMode = (m) => { applyMode(m); setMode(m); toast.success(m === 'light' ? 'Modo claro ativado' : 'Modo escuro ativado'); };
 
   return (
     <>
+      <Card title="Tema" desc="Escolha entre o modo escuro (padrão) e o modo claro. A preferência fica salva neste dispositivo.">
+        <div className="grid grid-cols-2 gap-3">
+          {[
+            { id: 'dark', label: 'Escuro', icon: Moon, sw: ['#0b1120', '#22d3ee'] },
+            { id: 'light', label: 'Claro', icon: Sun, sw: ['#f4f8fb', '#0f9bb5'] },
+          ].map((m) => {
+            const active = mode === m.id;
+            return (
+              <button key={m.id} onClick={() => chooseMode(m.id)}
+                className={`relative rounded-xl border p-4 flex items-center gap-3 transition ${active ? 'border-primary bg-primary/5' : 'border-border/60 hover:border-primary/40'}`}>
+                <div className="w-10 h-10 rounded-lg grid place-items-center border" style={{ background: m.sw[0], borderColor: m.sw[1] }}>
+                  <m.icon className="w-4 h-4" style={{ color: m.sw[1] }} />
+                </div>
+                <span className="text-sm font-medium text-foreground">{m.label}</span>
+                {active && <Check className="w-4 h-4 text-primary absolute top-3 right-3" />}
+              </button>
+            );
+          })}
+        </div>
+      </Card>
+
       <Card title="Cor de destaque" desc="Personalize a cor principal do Neurix. A mudança é aplicada em todo o app, incluindo o logo.">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {THEMES.map((t) => {
