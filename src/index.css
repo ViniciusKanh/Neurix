@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,202 +6,206 @@
 
 @layer base {
   :root {
-    --font-display: 'Orbitron', sans-serif;
-    --font-sans: 'Rajdhani', system-ui, sans-serif;
-    --font-mono: 'JetBrains Mono', monospace;
+    --font-display: 'Space Grotesk', system-ui, sans-serif;
+    --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 
-    --background: 220 45% 4%;
-    --foreground: 195 80% 90%;
+    --background: 222 47% 4%;
+    --foreground: 195 45% 92%;
 
-    --card: 220 40% 6%;
-    --card-foreground: 195 80% 90%;
+    --card: 221 42% 6.5%;
+    --card-foreground: 195 45% 92%;
 
-    --popover: 220 42% 7%;
-    --popover-foreground: 195 80% 90%;
+    --popover: 221 44% 7%;
+    --popover-foreground: 195 45% 92%;
 
-    --primary: 185 100% 50%;
+    --primary: 187 92% 52%;
     --primary-foreground: 220 45% 5%;
 
-    --secondary: 210 30% 14%;
-    --secondary-foreground: 195 80% 90%;
+    --secondary: 213 30% 15%;
+    --secondary-foreground: 195 45% 92%;
 
-    --muted: 210 28% 13%;
-    --muted-foreground: 210 20% 55%;
+    --muted: 213 28% 13%;
+    --muted-foreground: 211 20% 64%;
 
-    --accent: 160 100% 45%;
+    --accent: 160 84% 46%;
     --accent-foreground: 220 45% 5%;
 
-    --destructive: 0 80% 55%;
+    --destructive: 0 78% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 210 30% 12%;
-    --input: 210 30% 14%;
-    --ring: 185 100% 50%;
+    --border: 211 28% 15%;
+    --input: 211 28% 16%;
+    --ring: 187 92% 52%;
 
-    --chart-1: 185 100% 50%;
-    --chart-2: 160 100% 45%;
-    --chart-3: 265 90% 65%;
-    --chart-4: 40 100% 55%;
-    --chart-5: 330 90% 60%;
+    /* Extra depth surfaces used by utilities below */
+    --elevated: 221 40% 9%;
+    --hairline: 211 28% 20%;
 
-    --sidebar-background: 220 45% 5%;
-    --sidebar-foreground: 195 60% 82%;
-    --sidebar-primary: 185 100% 50%;
+    --chart-1: 187 92% 52%;
+    --chart-2: 160 84% 46%;
+    --chart-3: 255 90% 70%;
+    --chart-4: 40 100% 58%;
+    --chart-5: 330 88% 64%;
+
+    --sidebar-background: 222 46% 5%;
+    --sidebar-foreground: 200 35% 84%;
+    --sidebar-primary: 187 92% 52%;
     --sidebar-primary-foreground: 220 45% 5%;
-    --sidebar-accent: 210 30% 12%;
-    --sidebar-accent-foreground: 195 80% 90%;
-    --sidebar-border: 210 30% 12%;
-    --sidebar-ring: 185 100% 50%;
+    --sidebar-accent: 213 30% 13%;
+    --sidebar-accent-foreground: 195 45% 92%;
+    --sidebar-border: 211 28% 13%;
+    --sidebar-ring: 187 92% 52%;
 
-    --radius: 0.6rem;
+    --radius: 0.7rem;
   }
 
-  /* Single dark theme — .dark mirrors :root */
-  .dark {
-    --background: 220 45% 4%;
-    --foreground: 195 80% 90%;
-    --card: 220 40% 6%;
-    --card-foreground: 195 80% 90%;
-    --popover: 220 42% 7%;
-    --popover-foreground: 195 80% 90%;
-    --primary: 185 100% 50%;
-    --primary-foreground: 220 45% 5%;
-    --secondary: 210 30% 14%;
-    --secondary-foreground: 195 80% 90%;
-    --muted: 210 28% 13%;
-    --muted-foreground: 210 20% 55%;
-    --accent: 160 100% 45%;
-    --accent-foreground: 220 45% 5%;
-    --destructive: 0 80% 55%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 210 30% 12%;
-    --input: 210 30% 14%;
-    --ring: 185 100% 50%;
-    --sidebar-background: 220 45% 5%;
-    --sidebar-foreground: 195 60% 82%;
-    --sidebar-accent: 210 30% 12%;
-    --sidebar-accent-foreground: 195 80% 90%;
-    --sidebar-border: 210 30% 12%;
-  }
+  .dark { color-scheme: dark; }
 
-  * {
-    border-color: hsl(var(--border));
-  }
+  * { border-color: hsl(var(--border)); }
+
+  html { scroll-behavior: smooth; }
 
   body {
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
     font-family: var(--font-sans);
+    font-feature-settings: "cv02", "cv03", "cv04", "ss01";
+    letter-spacing: -0.006em;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
 
-  .font-display { font-family: var(--font-display); }
+  .font-display { font-family: var(--font-display); letter-spacing: -0.02em; }
   .font-mono { font-family: var(--font-mono); }
+
+  /* Visible, on-brand keyboard focus everywhere */
+  :where(a, button, input, select, textarea, [role="button"], [tabindex]):focus-visible {
+    outline: 2px solid hsl(var(--ring) / 0.9);
+    outline-offset: 2px;
+    border-radius: calc(var(--radius) - 3px);
+  }
+
+  ::selection { background: hsl(var(--primary) / 0.3); color: hsl(var(--foreground)); }
+
+  /* Headings inherit the display face for a consistent, confident voice */
+  h1, h2, h3 { font-family: var(--font-display); letter-spacing: -0.02em; }
 }
 
 @layer utilities {
-  /* Glass panels */
+  /* Glass panels — subtle top highlight for real depth */
   .glass {
-    background: hsla(220, 40%, 8%, 0.55);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid hsla(210, 30%, 40%, 0.12);
+    background:
+      linear-gradient(180deg, hsla(0,0%,100%,0.03), hsla(0,0%,100%,0) 40%),
+      hsla(221, 40%, 8%, 0.6);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid hsla(210, 30%, 60%, 0.10);
   }
   .glass-strong {
-    background: hsla(220, 42%, 7%, 0.85);
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
-    border: 1px solid hsla(210, 30%, 45%, 0.16);
+    background:
+      linear-gradient(180deg, hsla(0,0%,100%,0.04), hsla(0,0%,100%,0) 45%),
+      hsla(221, 44%, 7%, 0.86);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid hsla(210, 30%, 62%, 0.14);
   }
   .glass-hud {
-    background: hsla(220, 45%, 5%, 0.7);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 1px solid hsla(185, 100%, 50%, 0.2);
+    background: hsla(222, 46%, 5%, 0.72);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid hsl(var(--primary) / 0.2);
   }
 
-  /* Glows */
-  .glow-primary { box-shadow: 0 0 18px -2px hsla(185, 100%, 50%, 0.45); }
-  .glow-accent { box-shadow: 0 0 18px -2px hsla(160, 100%, 45%, 0.45); }
+  /* Elevated surface with soft ambient shadow */
+  .surface-raised {
+    background: hsl(var(--card) / 0.72);
+    box-shadow:
+      inset 0 1px 0 0 hsla(0,0%,100%,0.035),
+      0 10px 34px -20px hsl(222 60% 2% / 0.85);
+  }
 
-  /* Gradient text */
+  /* Glows follow the active theme colour */
+  .glow-primary { box-shadow: 0 0 22px -6px hsl(var(--primary) / 0.55); }
+  .glow-accent { box-shadow: 0 0 22px -6px hsl(var(--accent) / 0.55); }
+
+  /* Gradient text (theme-aware) */
   .text-gradient-primary {
-    background: linear-gradient(90deg, hsl(185, 100%, 55%), hsl(160, 100%, 50%));
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-    color: transparent;
+    background: linear-gradient(100deg, hsl(var(--primary)), hsl(var(--accent)));
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent; color: transparent;
   }
   .text-gradient-accent {
-    background: linear-gradient(90deg, hsl(160, 100%, 50%), hsl(185, 100%, 55%));
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-    color: transparent;
+    background: linear-gradient(100deg, hsl(var(--accent)), hsl(var(--primary)));
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent; color: transparent;
   }
 
-  /* Backgrounds */
+  /* A hairline divider that reads as structure, not decoration */
+  .rule-gradient { height: 1px; background: linear-gradient(90deg, hsl(var(--primary) / 0.35), hsl(var(--border) / 0.5) 45%, transparent); }
+
+  /* Backgrounds — finer + fainter than before */
   .bg-grid-pattern {
     background-image:
-      linear-gradient(hsla(185, 100%, 50%, 0.04) 1px, transparent 1px),
-      linear-gradient(90deg, hsla(185, 100%, 50%, 0.04) 1px, transparent 1px);
-    background-size: 40px 40px;
+      linear-gradient(hsl(var(--primary) / 0.028) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--primary) / 0.028) 1px, transparent 1px);
+    background-size: 44px 44px;
   }
   .bg-scan-lines {
     background-image: repeating-linear-gradient(
-      0deg, hsla(185, 100%, 50%, 0.03) 0px,
-      hsla(185, 100%, 50%, 0.03) 1px, transparent 1px, transparent 3px
+      0deg, hsl(var(--primary) / 0.02) 0px,
+      hsl(var(--primary) / 0.02) 1px, transparent 1px, transparent 4px
     );
   }
   .bg-hex-pattern {
-    background-image: radial-gradient(hsla(185, 100%, 50%, 0.06) 1px, transparent 1px);
-    background-size: 24px 24px;
+    background-image: radial-gradient(hsl(var(--primary) / 0.05) 1px, transparent 1px);
+    background-size: 26px 26px;
+  }
+  /* Calm ambient aurora — the app canvas backdrop */
+  .app-aurora {
+    background:
+      radial-gradient(60% 45% at 12% 8%, hsl(var(--primary) / 0.09), transparent 60%),
+      radial-gradient(50% 40% at 92% 22%, hsl(255 90% 66% / 0.07), transparent 60%),
+      radial-gradient(55% 45% at 70% 98%, hsl(var(--accent) / 0.06), transparent 60%);
   }
 
-  /* Tactical borders */
-  .border-tactical { border: 1px solid hsla(185, 100%, 50%, 0.25); }
+  /* Tactical accents (kept, refined) */
+  .border-tactical { border: 1px solid hsl(var(--primary) / 0.25); }
   .hud-corners { position: relative; }
   .hud-corners::before,
   .hud-corners::after {
-    content: '';
-    position: absolute;
-    width: 10px; height: 10px;
-    border-color: hsl(var(--primary));
-    border-style: solid;
+    content: ''; position: absolute; width: 11px; height: 11px;
+    border-color: hsl(var(--primary) / 0.8); border-style: solid;
   }
   .hud-corners::before { top: 0; left: 0; border-width: 1px 0 0 1px; }
   .hud-corners::after { bottom: 0; right: 0; border-width: 0 1px 1px 0; }
 
-  /* Status indicators */
-  .status-online { color: hsl(160, 100%, 45%); }
-  .status-warning { color: hsl(40, 100%, 55%); }
-  .status-danger { color: hsl(0, 80%, 55%); }
+  .status-online { color: hsl(var(--accent)); }
+  .status-warning { color: hsl(40, 100%, 58%); }
+  .status-danger { color: hsl(var(--destructive)); }
 
-  /* Thin scrollbar */
-  .scrollbar-thin { scrollbar-width: thin; scrollbar-color: hsla(185,100%,50%,0.3) transparent; }
-  .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+  /* Scrollbar */
+  .scrollbar-thin { scrollbar-width: thin; scrollbar-color: hsl(var(--primary) / 0.28) transparent; }
+  .scrollbar-thin::-webkit-scrollbar { width: 7px; height: 7px; }
   .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
-  .scrollbar-thin::-webkit-scrollbar-thumb {
-    background: hsla(185, 100%, 50%, 0.25);
-    border-radius: 3px;
-  }
-  .scrollbar-thin::-webkit-scrollbar-thumb:hover { background: hsla(185, 100%, 50%, 0.45); }
+  .scrollbar-thin::-webkit-scrollbar-thumb { background: hsl(var(--primary) / 0.22); border-radius: 4px; }
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover { background: hsl(var(--primary) / 0.4); }
 
-  /* Animations */
-  .animate-glow-pulse { animation: glow-pulse 2.4s ease-in-out infinite; }
+  .animate-glow-pulse { animation: glow-pulse 2.6s ease-in-out infinite; }
   .animate-scan { animation: scan 3s linear infinite; }
   .animate-radar { animation: radar 4s linear infinite; }
 }
 
 @keyframes glow-pulse {
-  0%, 100% { box-shadow: 0 0 12px -4px hsla(185, 100%, 50%, 0.4); }
-  50% { box-shadow: 0 0 26px 0 hsla(185, 100%, 50%, 0.7); }
+  0%, 100% { box-shadow: 0 0 12px -4px hsl(var(--primary) / 0.4); }
+  50% { box-shadow: 0 0 28px 0 hsl(var(--primary) / 0.7); }
 }
-@keyframes scan {
-  0% { transform: translateY(-100%); }
-  100% { transform: translateY(100%); }
-}
-@keyframes radar {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+@keyframes scan { 0% { transform: translateY(-100%); } 100% { transform: translateY(100%); } }
+@keyframes radar { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+/* Respect users who prefer less motion */
+@media (prefers-reduced-motion: reduce) {
+  .animate-glow-pulse, .animate-scan, .animate-radar { animation: none !important; }
+  html { scroll-behavior: auto; }
 }

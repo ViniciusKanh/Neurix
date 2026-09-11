@@ -4,7 +4,7 @@
 const KEY = 'neurix_theme';
 
 export const THEMES = [
-  { id: 'cyan',    name: 'Neural Cyan',  primary: '185 100% 50%', accent: '160 100% 45%' },
+  { id: 'cyan',    name: 'Neural Cyan',  primary: '187 92% 52%',  accent: '160 84% 46%' },
   { id: 'azure',   name: 'Azure',        primary: '205 100% 56%', accent: '185 100% 50%' },
   { id: 'violet',  name: 'Violet',       primary: '265 90% 66%',  accent: '190 100% 55%' },
   { id: 'magenta', name: 'Magenta',      primary: '320 100% 62%', accent: '265 90% 66%' },
