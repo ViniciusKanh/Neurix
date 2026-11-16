@@ -1,28 +1,25 @@
 # CI/CD do pacote @viniciuskanh/neurix-data-tools (packages/neurix-data-tools).
 #
-# - Pull requests / pushes na main que alteram o pacote: validação completa
-#   (tipos, testes, build, npm pack --dry-run, instalação do tarball) e
-#   testes da aplicação Neurix, que consome o pacote via src/lib/*.
-# - Publicação no GitHub Packages SOMENTE para tags `neurix-data-tools-vX.Y.Z`,
-#   após a validação, conferindo versão, commit e duplicidade.
-#   Pull requests nunca publicam.
+# Fluxo direto na main (sem pull requests):
+# - Todo push na main que altera o pacote (ou os pontos de entrada do Neurix)
+#   valida o pacote (tipos, testes, build, npm pack --dry-run, instalação do
+#   tarball em Node 18/20/22) e roda testes + build da aplicação Neurix.
+# - Publicação no GitHub Packages SOMENTE com a tag `neurix-data-tools-vX.Y.Z`,
+#   após a validação, conferindo versão, commit na main e duplicidade.
 name: neurix-data-tools
 
 on:
-  pull_request:
+  push:
+    branches: [main]
     paths:
       - 'packages/neurix-data-tools/**'
       - 'src/lib/dataQuality.js'
       - 'src/lib/featureEng.js'
       - 'src/lib/datasetProfile.js'
       - '.github/workflows/publish-neurix-data-tools.yml'
-  push:
-    branches: [main]
-    paths:
-      - 'packages/neurix-data-tools/**'
-      - '.github/workflows/publish-neurix-data-tools.yml'
     tags:
       - 'neurix-data-tools-v*'
+  workflow_dispatch:
 
 permissions:
   contents: read
