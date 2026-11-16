@@ -35,6 +35,7 @@
 - [🏗️ Arquitetura](#️-arquitetura)
 - [🖥️ Tour pelas telas](#️-tour-pelas-telas)
 - [🧪 Motor de ML local](#-motor-de-ml-local)
+- [📦 Biblioteca npm: Neurix Data Tools](#-biblioteca-npm-neurix-data-tools)
 - [🚀 Como rodar (passo a passo)](#-como-rodar-passo-a-passo)
 - [🔐 Login, 2FA e permissões](#-login-2fa-e-permissões)
 - [🎨 Personalização visual](#-personalização-visual)
@@ -217,6 +218,36 @@ flowchart LR
 
 ---
 
+## 📦 Biblioteca npm: Neurix Data Tools
+
+O núcleo de **qualidade de dados, imputação, engenharia de atributos, correlação e perfilamento** do Neurix também está disponível como biblioteca independente — sem React, sem backend, sem IA externa, para Node.js e navegador:
+
+**[`@viniciuskanh/neurix-data-tools`](https://github.com/ViniciusKanh/Neurix/pkgs/npm/neurix-data-tools)** · publicado no GitHub Packages · código em [`packages/neurix-data-tools`](./packages/neurix-data-tools)
+
+```bash
+# .npmrc do seu projeto (token com read:packages em NODE_AUTH_TOKEN)
+# @viniciuskanh:registry=https://npm.pkg.github.com
+# //npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}
+npm install @viniciuskanh/neurix-data-tools
+```
+
+```js
+import { analyzeQuality, Imputer, trainTestSplit } from '@viniciuskanh/neurix-data-tools';
+
+const colunas = [{ name: 'idade', type: 'number' }, { name: 'setor', type: 'string' }];
+const { train, test } = trainTestSplit(dados, { seed: 42 });
+
+console.log(analyzeQuality(train, colunas).issue_list);       // ausentes, tipos, duplicatas…
+const imputer = new Imputer({ columns: colunas }).fit(train); // mediana/moda aprendidas só no treino
+const testePronto = imputer.transform(test).rows;             // sem vazamento estatístico
+```
+
+📖 Documentação completa (API, limitações estatísticas, autenticação): [packages/neurix-data-tools/README.md](./packages/neurix-data-tools/README.md)
+
+A aplicação usa o mesmo código-fonte: `src/lib/dataQuality.js`, `src/lib/featureEng.js` e `src/lib/datasetProfile.js` reexportam o pacote.
+
+---
+
 ## 🚀 Como rodar (passo a passo)
 
 > **Pré-requisitos:** Node.js 18+ e uma conta no [Turso](https://turso.tech).
@@ -281,6 +312,8 @@ Neurix/
 │   └── _lib/            # db, util, handlers, pages, auth
 ├── scripts/
 │   └── migrate.mjs      # cria tabelas + admin no Turso
+├── packages/
+│   └── neurix-data-tools/ # 📦 biblioteca npm (qualidade, features, perfilamento)
 ├── server.mjs           # servidor de API local (dev) — mesmas funções da Vercel
 ├── src/
 │   ├── api/             # client Turso (mesma forma do SDK antigo)

@@ -1,0 +1,152 @@
+# CI/CD do pacote @viniciuskanh/neurix-data-tools (packages/neurix-data-tools).
+#
+# - Pull requests / pushes na main que alteram o pacote: validação completa
+#   (tipos, testes, build, npm pack --dry-run, instalação do tarball) e
+#   testes da aplicação Neurix, que consome o pacote via src/lib/*.
+# - Publicação no GitHub Packages SOMENTE para tags `neurix-data-tools-vX.Y.Z`,
+#   após a validação, conferindo versão, commit e duplicidade.
+#   Pull requests nunca publicam.
+name: neurix-data-tools
+
+on:
+  pull_request:
+    paths:
+      - 'packages/neurix-data-tools/**'
+      - 'src/lib/dataQuality.js'
+      - 'src/lib/featureEng.js'
+      - 'src/lib/datasetProfile.js'
+      - '.github/workflows/publish-neurix-data-tools.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'packages/neurix-data-tools/**'
+      - '.github/workflows/publish-neurix-data-tools.yml'
+    tags:
+      - 'neurix-data-tools-v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: neurix-data-tools-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+defaults:
+  run:
+    working-directory: packages/neurix-data-tools
+
+jobs:
+  validate:
+    name: Validar pacote (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        node: [18, 20, 22]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+          cache-dependency-path: packages/neurix-data-tools/package-lock.json
+
+      - name: Instalar dependências (reprodutível)
+        run: npm ci
+
+      - name: Verificar tipos (TypeScript strict — atua como lint)
+        run: npm run typecheck
+
+      - name: Testes unitários e estatísticos
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Inspecionar conteúdo do pacote
+        run: npm pack --dry-run
+
+      - name: Instalar o tarball num consumidor temporário
+        run: npm run test:consumer
+
+  app-compat:
+    name: Compatibilidade com a aplicação Neurix
+    runs-on: ubuntu-latest
+    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      - name: Testes do Neurix (inclui os testes do pacote)
+        run: npx vitest run
+      - name: Build da aplicação
+        run: npm run build
+
+  publish:
+    name: Publicar no GitHub Packages
+    needs: validate
+    if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/neurix-data-tools-v') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@viniciuskanh'
+          cache: npm
+          cache-dependency-path: packages/neurix-data-tools/package-lock.json
+
+      - name: Conferir tag × versão do package.json
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#neurix-data-tools-v}"
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          echo "tag=$TAG_VERSION package=$PKG_VERSION"
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::A tag ($TAG_VERSION) não corresponde à versão do package.json ($PKG_VERSION)."
+            exit 1
+          fi
+
+      - name: Conferir que o commit da tag está na main
+        run: |
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::O commit $GITHUB_SHA da tag não pertence à branch main."
+            exit 1
+          fi
+
+      - name: Impedir versão duplicada
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          NAME="$(node -p "require('./package.json').name")"
+          VERSION="$(node -p "require('./package.json').version")"
+          if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
+            echo "::error::$NAME@$VERSION já está publicado."
+            exit 1
+          fi
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npm pack --dry-run
+
+      - name: Publicar
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm publish

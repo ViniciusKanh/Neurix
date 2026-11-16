@@ -325,8 +325,8 @@ function CorrelationHeatmap({ corrData, real }) {
               <td className="p-1 text-muted-foreground text-right pr-2 truncate max-w-[80px]">{columns[i]}</td>
               {row.map((val, j) => (
                 <td key={j} className={cn('p-0.5')}>
-                  <div className={cn('w-10 h-8 flex items-center justify-center rounded text-[9px] font-bold transition-all', getColor(val))}>
-                    {val.toFixed(2)}
+                  <div className={cn('w-10 h-8 flex items-center justify-center rounded text-[9px] font-bold transition-all', val == null ? 'bg-secondary/30 text-muted-foreground' : getColor(val))} title={val == null ? 'Correlação indefinida (coluna constante ou poucas observações)' : undefined}>
+                    {val == null ? '—' : val.toFixed(2)}
                   </div>
                 </td>
               ))}

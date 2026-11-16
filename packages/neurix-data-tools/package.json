@@ -1,0 +1,68 @@
+{
+  "name": "@viniciuskanh/neurix-data-tools",
+  "version": "0.1.0",
+  "description": "Data quality, imputation, feature engineering, correlation and statistical profiling for JavaScript/TypeScript — extracted from the Neurix ML workbench. Zero runtime dependencies, runs locally (Node.js and browsers).",
+  "keywords": [
+    "data-science",
+    "data-quality",
+    "feature-engineering",
+    "imputation",
+    "profiling",
+    "statistics",
+    "correlation",
+    "machine-learning",
+    "preprocessing",
+    "neurix"
+  ],
+  "author": "Vinicius Santos (https://github.com/ViniciusKanh)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ViniciusKanh/Neurix.git",
+    "directory": "packages/neurix-data-tools"
+  },
+  "homepage": "https://github.com/ViniciusKanh/Neurix/tree/main/packages/neurix-data-tools#readme",
+  "bugs": {
+    "url": "https://github.com/ViniciusKanh/Neurix/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "!dist/**/*.tsbuildinfo",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "restricted"
+  },
+  "scripts": {
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build": "npm run clean && tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:consumer": "node scripts/consumer-test.mjs",
+    "pack:check": "npm pack --dry-run",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.2",
+    "vitest": "^2.1.9"
+  }
+}
